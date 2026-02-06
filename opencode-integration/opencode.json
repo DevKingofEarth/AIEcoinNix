@@ -1,0 +1,228 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "*": "allow",
+    "pkill": "deny",
+    "kill": "deny",
+    "pkill opencode": "deny",
+    "pkill .*opencode": "deny",
+    "kill .*opencode": "deny",
+    "rm -rf */": "deny"
+  },
+  "agent": {
+    "builder": {
+      "mode": "primary",
+      "description": "🔧 Implementation engine powered by Ralphy-wiggum with Oracle strategic oversight",
+      "temperature": 0.1,
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "permission": {
+        "bash": {
+          "*": "allow",
+          "pkill opencode": "deny",
+          "kill": "deny",
+          "pkill": "deny",
+          "pkill .*opencode": "deny",
+          "kill .*opencode": "deny"
+        },
+        "edit": "allow",
+        "write": "allow"
+      }
+    },
+    "planner": {
+      "mode": "primary",
+      "description": "📋 Strategic planning agent - Creates plans and analysis, leaves implementation to Builder",
+      "temperature": 0.1,
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": false
+      },
+      "permission": {
+        "bash": {
+          "*": "ask",
+          "grep *": "allow",
+          "cat *": "allow",
+          "head *": "allow",
+          "tail *": "allow",
+          "find *": "allow",
+          "ls *": "allow",
+          "pwd": "allow",
+          "cd *": "deny",
+          "mv *": "deny",
+          "cp *": "deny",
+          "rm *": "deny",
+          "mkdir *": "deny",
+          "rmdir *": "deny"
+        },
+        "edit": {
+          "*": "ask",
+          "IMPLEMENTATION_PLAN.md": "allow",
+          "*.todo": "allow",
+          "*.notes": "allow"
+        },
+        "write": {
+          "*": "ask",
+          "IMPLEMENTATION_PLAN.md": "allow",
+          "*.todo": "allow",
+          "*.notes": "allow"
+        }
+      }
+    },
+    "oracle": {
+      "mode": "subagent",
+      "description": "🔮 Strategic technical advisor for architecture, debugging, and engineering guidance",
+      "temperature": 0.1,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "permission": {
+        "bash": "deny",
+        "edit": "deny",
+        "write": "deny"
+      }
+    },
+    "librarian": {
+      "mode": "subagent",
+      "description": "📚 External documentation and library research specialist using local-web exclusively",
+      "temperature": 0.1,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "permission": {
+        "bash": "deny",
+        "edit": "deny",
+        "write": "deny"
+      }
+    },
+    "designer": {
+      "mode": "subagent",
+      "description": "🎨 Frontend UI/UX specialist for visual design and user experience",
+      "temperature": 0.7,
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "permission": {
+        "bash": {
+          "*": "allow",
+          "pkill opencode": "deny",
+          "kill": "deny",
+          "pkill": "deny",
+          "pkill .*opencode": "deny",
+          "kill .*opencode": "deny"
+        },
+        "edit": "allow",
+        "write": "allow"
+      }
+    },
+    "fixer": {
+      "mode": "subagent",
+      "description": "🔧 Fast implementation specialist for bugs and issues",
+      "temperature": 0.2,
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "permission": {
+        "bash": {
+          "*": "allow",
+          "pkill opencode": "deny",
+          "kill": "deny",
+          "pkill": "deny",
+          "pkill .*opencode": "deny",
+          "kill .*opencode": "deny"
+        },
+        "edit": "allow",
+        "write": "allow"
+      }
+    },
+    "researcher": {
+      "mode": "primary",
+      "description": "🔍 Privacy-focused research assistant using local AI services",
+      "temperature": 0.3,
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "permission": {
+        "bash": {
+          "*": "allow",
+          "pkill opencode": "deny",
+          "kill": "deny"
+        },
+        "edit": "allow",
+        "write": "allow"
+      }
+    },
+    "search-helper": {
+      "mode": "subagent",
+      "description": "🔍 Focused web search specialist using local SearXNG + Web Parser services",
+      "temperature": 0.1,
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "permission": {
+        "bash": "deny",
+        "edit": "deny",
+        "write": "deny"
+      }
+    }
+  },
+  "provider": {
+    "ollama-local": {
+      "name": "Local Ollama",
+      "options": {
+        "baseURL": "http://localhost:11434/v1",
+        "apiKey": "ollama",
+        "timeout": 120000
+      },
+      "models": {
+        "devstral-small-2:24b-cloud": {
+          "id": "devstral-small-2:24b-cloud",
+          "name": "devstral-small2 cloud (24B)",
+          "family": "Devstral",
+          "tool_call": true,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cache_read": 0,
+            "cache_write": 0
+          },
+          "limit": {
+            "context": 32768,
+            "output": 4096
+          }
+        },
+        "functiongemma:270m": {
+          "id": "functiongemma:270m",
+          "name": "Function Gemma (270M)",
+          "family": "Gemma",
+          "tool_call": true,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cache_read": 0,
+            "cache_write": 0
+          },
+          "limit": {
+            "context": 8192,
+            "output": 2048
+          }
+        }
+      }
+    }
+  }
+}
