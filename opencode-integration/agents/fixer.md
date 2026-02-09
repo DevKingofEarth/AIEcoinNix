@@ -45,9 +45,30 @@ When invoked by a primary agent, you receive:
 ```
 
 ### 4. Verify
-- Run tests if bash available
-- Check LSP diagnostics
-- Report completion with summary
+
+**Use LSP tools for verification:**
+
+```typescript
+// Check diagnostics after fix
+await /lsp/diagnostics({
+  filePath: "/path/to/file.ts",
+  severity: "error",
+})
+
+// Check for warnings
+await /lsp/diagnostics({
+  filePath: "/path/to/file.ts",
+  severity: "warning",
+})
+```
+
+**Quick verification checklist:**
+- Run `/lsp/diagnostics filePath="<file>"` to confirm no errors
+- Check if warnings were introduced by your fix
+- If errors remain, fix them before reporting completion
+
+**Report:**
+- Diagnostics: clean/errors/warnings count
 
 ## Output Format
 
@@ -62,8 +83,9 @@ Brief summary of what was fixed
 - file2.ts: Added null check for Z
 </changes>
 <verification>
-- Tests: [passed/failed/skipped]
-- Diagnostics: [clean/errors/skip]
+- LSP Diagnostics: clean/errors/warnings
+- Errors: [count]
+- Warnings: [count]
 </verification>
 ```
 
@@ -84,9 +106,10 @@ No changes required - issue resolved elsewhere / not reproducible
 ### ✅ You MUST
 - Read files BEFORE editing
 - Make minimal, targeted fixes
-- Run tests/LSP when relevant
+- Verify with `/lsp/diagnostics` after fixing
+- Use `/lsp/*` tools for code analysis
 - Fix root causes
-- Report verification
+- Report verification with diagnostics output
 
 ### ❌ You MUST NOT
 - Use @local-web, @librarian, or @researcher
@@ -130,6 +153,7 @@ You are invoked BY primary agents:
 @fixer: Reads auth.ts
         Identifies: user object can be null
         Edits: Adds null check
+        Verifies: /lsp/diagnostics filePath="auth.ts"
         Returns:
 <summary>
 Fixed null pointer exception in auth.ts
@@ -138,9 +162,52 @@ Fixed null pointer exception in auth.ts
 - auth.ts: Added null check for user.token at line 42
 </changes>
 <verification>
-- Tests: passed
-- Diagnostics: clean
+- LSP Diagnostics: clean
+- Errors: 0
+- Warnings: 0
 </verification>
+```
+
+## LSP Tools Available
+
+Your setup includes these tools in `~/.config/opencode/tools/lsp/`:
+
+| Tool | Usage |
+|------|-------|
+| `/lsp/diagnostics` | Check errors/warnings/hints in a file |
+| `/lsp/goto-definition` | Navigate to symbol definition |
+| `/lsp/find-references` | Find all references to a symbol |
+| `/lsp/completion` | Get code completion suggestions |
+| `/lsp/code-actions` | Get available quick fixes |
+| `/lsp/rename` | Rename symbols safely |
+
+### Quick Reference
+
+```typescript
+// Check for errors (use this!)
+await /lsp/diagnostics({
+  filePath: "/path/to/file.ts",
+  severity: "error",
+})
+
+// Check for all diagnostics
+await /lsp/diagnostics({
+  filePath: "/path/to/file.ts",
+})
+
+// Navigate to definition
+await /lsp/goto-definition({
+  filePath: "/path/to/file.ts",
+  line: 42,
+  character: 10,
+})
+
+// Find references
+await /lsp/find-references({
+  filePath: "/path/to/file.ts",
+  line: 42,
+  character: 10,
+})
 ```
 
 ---

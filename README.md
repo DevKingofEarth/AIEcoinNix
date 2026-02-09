@@ -12,8 +12,8 @@ Written in nix, are the list of systemd services
 
 ### OpenCode Setup
 Configured with local services for AI-assisted development
-- Uses @local-web tool for web search
-- @local-web connects to Web Parser (port 18090)
+- Uses /local-web tool for web search
+- /local-web connects to Web Parser (port 18090)
 And other custom agents as well.
 
 ## 📁 Project Structure
@@ -39,13 +39,16 @@ AIEcoinNix/
 │       ├── local-services-status.ts
 │       ├── local-services-start.ts
 │       ├── luffy-loop.ts
-│       └── oracle-control.ts
+│       ├── oracle-control.ts
+│       └── lsp/             # LSP code analysis tools
 └── opencode-integration/    # Backup/portable OpenCode setup
     ├── opencode.json        # Main configuration
     ├── agents/              # Agent definitions (.md)
     ├── tools/               # Tool implementations
     │   ├── *.ts            # TypeScript source (IN REPO)
-    │   └── *.js            # Compiled (GENERATED, NOT IN REPO)
+    │   ├── *.js            # Compiled (GENERATED, NOT IN REPO)
+    │   └── lsp/            # LSP tools (7 .ts files)
+    ├── tools/luffyg5.jpg   # Luffy Loop architecture diagram
     └── build.sh             # Build script (compile TS → JS)
 ```
 
@@ -57,7 +60,7 @@ Self-hosted services managed by NixOS:
 |---------|------|---------|
 | Perplexica | 3000 | AI research (browser-based) |
 | SearXNG | 18081 | Meta-search for private web search |
-| Web Parser | 18090 | Content extraction for @local-web |
+| Web Parser | 18090 | Content extraction for /local-web |
 
 ## 📦 Service File
 
@@ -73,7 +76,7 @@ The `smartassist.nix` module provides systemd services for your AI development e
 - `ollama.service` - Local LLM inference
 - `searx.service` - Private meta-search engine
 - `perplexica.service` - AI research interface
-- `web-parser.service` - Content extraction for @local-web
+- `web-parser.service` - Content extraction for /local-web
 
 **Example Imports:**
 ```nix
@@ -112,9 +115,41 @@ imports = [ /path/to/smartassist.nix ];
 
 | Tool | Purpose |
 |------|---------|
-| **@luffy_loop** | Autonomous execution |
-| **@oracle_control** | Oracle checkpoint reviews |
-| **@local-web** | Private web search |
+| **/luffy_loop** | Autonomous execution |
+| **/oracle_control** | Oracle checkpoint reviews |
+| **/local-web** | Private web search |
+| **/lsp/** | LSP code analysis (7 tools) |
+
+---
+
+## LSP Tools
+
+Language Server Protocol tools for code analysis and refactoring.
+
+| Tool | Purpose |
+|------|---------|
+| `/lsp/diagnostics` | Check errors, warnings, hints |
+| `/lsp/goto-definition` | Navigate to definitions |
+| `/lsp/find-references` | Find symbol references |
+| `/lsp/completion` | Code completion |
+| `/lsp/code-actions` | Quick fixes |
+| `/lsp/rename` | Safe renaming |
+
+**Used by:** @fixer for verification after code fixes
+
+**Implementation:** `opencode-integration/tools/lsp/`
+
+---
+
+## Luffy Loop Architecture
+
+![Luffy Loop Architecture](opencode-integration/tools/luffyg5.jpg)
+
+Autonomous execution with checkpoint-based progress:
+
+- **Autonomous iterations** - Execute tasks until checkpoint or completion
+- **State persistence** - Progress saved to `.opencode/luffy-loop.json`
+- **Oracle oversight** - Oracle reviews at every checkpoint
 
 ---
 
@@ -127,7 +162,7 @@ imports = [ /path/to/smartassist.nix ];
 - **@librarian**: Research with @local-web
 
 **Tools:**
-- **@local-web**: Research with private web search
+- **/local-web**: Research with private web search
 
 ---
 
@@ -140,9 +175,9 @@ imports = [ /path/to/smartassist.nix ];
 - **@librarian**: Documentation lookup
 
 **Tools:**
-- **@luffy_loop**: Autonomous execution
-- **@loop-state**: State persistence
-- **@oracle_control**: Oracle checkpoint reviews
+- **/luffy_loop**: Autonomous execution
+- **/loop-state**: State persistence
+- **/oracle_control**: Oracle checkpoint reviews
 
 ---
 
@@ -151,22 +186,19 @@ imports = [ /path/to/smartassist.nix ];
 ### Web Parser Dependencies
 | Project | Purpose |
 |---------|---------|
-| [FastAPI](https://fastapi.tiangolo.com/) | Web framework |
-| [Pydantic](https://docs.pydantic.dev/) | Data validation |
-| [httpx](https://www.python-httpx.org/) | HTTP client |
-| [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) | HTML parsing |
-| [Trafilatura](https://trafilatura.org/) | Web content extraction |
+| [FastAPI](https://fastapi.tiangolo.com/) | Web framework ([GitHub](https://github.com/fastapi/fastapi)) |
+| [Pydantic](https://docs.pydantic.dev/) | Data validation ([GitHub](https://github.com/pydantic/pydantic)) |
+| [httpx](https://www.python-httpx.org/) | HTTP client ([GitHub](https://github.com/encode/httpx)) |
+| [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) | HTML parsing ([GitHub](https://www.crummy.com/software/BeautifulSoup/)) |
+| [Trafilatura](https://trafilatura.readthedocs.io/en/latest/) | Web content extraction ([GitHub](https://github.com/adbar/trafilatura)) |
 
 ### Services
 | Project | Purpose |
 |---------|---------|
-| [SearXNG](https://searxng.github.io/searxng/) | Privacy-respecting search |
-| [Perplexica](https://github.com/ItzCrazyKns/Perplexica) | AI research |
+| [SearXNG](https://searxng.github.io/searxng/) | Privacy-respecting search ([GitHub](https://github.com/searxng/searxng)) |
+| [Perplexica](https://github.com/ItzCrazyKns/Perplexica) | AI research ([GitHub](https://github.com/ItzCrazyKns/Perplexica)) |
 
 ### Infrastructure
-- [NixOS](https://nixos.org/) - Service deployment
+- [NixOS](https://nixos.org/) - Service deployment ([GitHub](https://github.com/NixOS/nix))
 - [OpenCode](https://opencode.ai/) - AI coding interface
-- [oh-my-opencode-slim](https://github.com/rtk-rnjn/oh-my-opencode-slim) - Agent framework for custom agents
-
-- [oh-my-opencode-slim](https://github.com/rtk-rnjn/oh-my-opencode-slim) - Agent framework for custom agents
-
+- [oh-my-opencode-slim](https://ohmyopencodeslim.com) - Agent framework for custom agents ([GitHub](https://github.com/alvinunreal/oh-my-opencode-slim))
