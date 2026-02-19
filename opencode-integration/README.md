@@ -22,7 +22,7 @@ cp tools/*.js ~/.config/opencode/tools/
 Luffy Loop is an autonomous execution system with checkpoint-based progress:
 
 - **Autonomous iterations** - Execute tasks until checkpoint or completion
-- **State persistence** - Progress saved to `.opencode/luffy-loop.json`
+- **State persistence** - Progress saved to `~/.config/opencode/.state/luffy-loop.json`
 - **Oracle oversight** - Oracle reviews at every checkpoint
 
 ### Oracle's Role
@@ -46,47 +46,38 @@ Oracle controls Luffy Loop at checkpoints:
 # Advance iteration
 @luffy_loop command=iterate
 
-# Oracle reviews checkpoint
-@oracle action=review
-
-# Oracle finalizes decision
-@oracle action=recommend recommendation=continue
-
-# Resume loop
+# Resume loop (after @oracle says CONTINUE)
 @luffy_loop command=resume
 
-# Terminate loop
+# Terminate loop (after @oracle says TERMINATE)
 @luffy_loop command=terminate
 ```
 
 ### Workflow
 
 ```
-1. @luffy_loop command=start prompt="..."
-2. @luffy_loop command=iterate (advances iterations)
-3. Checkpoint reached → Loop auto-pauses
-4. @oracle action=review → Oracle analyzes progress
-5. Oracle DECIDES: continue/pause/terminate
-6. @oracle action=recommend recommendation=[...]
-7. @luffy_loop command=resume
+1. Builder starts: @luffy_loop command=start prompt="..."
+2. Luffy iterates: @luffy_loop command=iterate
+3. Checkpoint reached → Loop auto-pauses → CHECKPOINT_SIGNAL
+4. Builder invokes: @oracle "Checkpoint X reached. What should I do?"
+5. @oracle internally uses /oracle_control, decides: CONTINUE/PAUSE/TERMINATE
+6. @oracle returns decision with reasoning
+7. Builder executes: /luffy_loop command=resume (or terminate)
 8. Repeat until complete
 ```
+
+**Critical:** Builder NEVER uses /oracle_control directly. Only @oracle subagent uses it internally.
 
 ## Local Services
 
 ### Web Search
 
-`local-web.ts` - Private local web search using SearXNG + Web Parser:
+`/local-web` - Private local web search using SearXNG + Web Parser:
 
-```typescript
-// Usage in OpenCode:
-@local-web query='machine learning trends' deep=true
 ```
-
-### Service Management
-
-- `local-services-start.ts` - Start local AI services
-- `local-services-status.ts` - Check service status
+# Usage in OpenCode:
+/local-web query='machine learning trends' deep=true
+```
 
 ## Files
 

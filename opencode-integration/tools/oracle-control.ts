@@ -2,7 +2,10 @@ import { tool } from "@opencode-ai/plugin"
 import fs from "fs";
 import path from "path";
 
-const STATE_FILE = ".opencode/luffy-loop.json";
+const STATE_FILE = path.join(
+  process.env.HOME || "~",
+  ".config/opencode/.state/luffy-loop.json"
+);
 
 interface LoopState {
   active: boolean;

@@ -35,11 +35,9 @@ AIEcoinNix/
 │   │   ├── researcher.md
 │   │   └── search-helper.md
 │   └── tools/               # Tool implementations
-│       ├── local-web.ts
-│       ├── local-services-status.ts
-│       ├── local-services-start.ts
 │       ├── luffy-loop.ts
 │       ├── oracle-control.ts
+│       ├── local-web.ts
 │       └── lsp/             # LSP code analysis tools
 └── opencode-integration/    # Backup/portable OpenCode setup
     ├── opencode.json        # Main configuration
@@ -148,7 +146,7 @@ Language Server Protocol tools for code analysis and refactoring.
 Autonomous execution with checkpoint-based progress:
 
 - **Autonomous iterations** - Execute tasks until checkpoint or completion
-- **State persistence** - Progress saved to `.opencode/luffy-loop.json`
+- **State persistence** - Progress saved to `~/.config/opencode/.state/luffy-loop.json`
 - **Oracle oversight** - Oracle reviews at every checkpoint
 
 ---
@@ -176,7 +174,6 @@ Autonomous execution with checkpoint-based progress:
 
 **Tools:**
 - **/luffy_loop**: Autonomous execution
-- **/loop-state**: State persistence
 - **/oracle_control**: Oracle checkpoint reviews
 
 ---

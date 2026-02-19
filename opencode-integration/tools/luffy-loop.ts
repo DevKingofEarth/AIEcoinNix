@@ -2,11 +2,11 @@ import { tool } from "@opencode-ai/plugin"
 import fs from "fs";
 import path from "path";
 
-// === LOOP-STATE UTILITY FUNCTIONS (INLINED) ===
-// State file location
-const STATE_FILE = ".opencode/luffy-loop.json";
+const STATE_FILE = path.join(
+  process.env.HOME || "~",
+  ".config/opencode/.state/luffy-loop.json"
+);
 
-// LoopState interface
 interface LoopState {
   active: boolean;
   paused: boolean;
@@ -20,7 +20,6 @@ interface LoopState {
   lastIterationAt: string;
 }
 
-// Default state
 const DEFAULT_STATE: LoopState = {
   active: false,
   paused: false,
@@ -34,7 +33,6 @@ const DEFAULT_STATE: LoopState = {
   lastIterationAt: ""
 };
 
-// Load state from file
 function loadState(): LoopState {
   try {
     const absolutePath = path.resolve(STATE_FILE);
@@ -49,7 +47,6 @@ function loadState(): LoopState {
   return { ...DEFAULT_STATE };
 }
 
-// Save state to file
 function saveState(state: LoopState): void {
   try {
     const absolutePath = path.resolve(STATE_FILE);
@@ -59,11 +56,10 @@ function saveState(state: LoopState): void {
     }
     fs.writeFileSync(absolutePath, JSON.stringify(state, null, 2));
   } catch (error) {
-    // Silently fail
+    // Silently fail - state won't persist
   }
 }
 
-// Reset state (delete state file)
 function resetState(): void {
   try {
     const absolutePath = path.resolve(STATE_FILE);
@@ -74,19 +70,6 @@ function resetState(): void {
     // Silently fail
   }
 }
-
-// Check if at checkpoint
-function checkAtCheckpoint(iteration: number, checkpointInterval: number, lastCheckpoint: number): boolean {
-  return iteration > 0 &&
-         iteration % checkpointInterval === 0 &&
-         iteration !== lastCheckpoint;
-}
-
-// Check for completion
-function checkCompletion(output: string, completionPromise: string): boolean {
-  return output.includes(completionPromise);
-}
-// === END LOOP-STATE UTILITY FUNCTIONS ===
 
 export default tool({
   description: `🦓 Luffy Loop - Autonomous executor with checkpoint reviews.
@@ -278,13 +261,18 @@ Progress: ${state.iteration}/${state.maxIterations} iterations completed`;
       state.lastCheckpoint = state.iteration;
       saveState(state);
       
-      message += `
-
-**Checkpoint ${state.iteration} reached!** Loop paused for Oracle review.
-
-**Oracle will now review and DECIDE: continue/pause/terminate.**
-
-Use @oracle action=review to trigger Oracle review immediately.`;
+      // Return structured signal for programmatic detection
+      return JSON.stringify({
+        __type: "CHECKPOINT_SIGNAL",
+        iteration: state.iteration,
+        maxIterations: state.maxIterations,
+        prompt: state.prompt,
+        stateFile: STATE_FILE,
+        paused: true,
+        message: `**Checkpoint ${state.iteration} reached!** Loop paused for Oracle review.`,
+        action: "INVOKE_ORACLE",
+        reason: "Checkpoint interval reached - requires Oracle review and decision"
+      }, null, 2);
     } else {
       saveState(state);
       message += `
