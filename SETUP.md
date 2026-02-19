@@ -87,7 +87,7 @@ curl http://localhost:18081
 ## 2. OpenCode Setup
 
 ### Prerequisites
-- OpenCode installed: https://opencode.ai
+- OpenCode installed: https://opencode.ai ([GitHub](https://github.com/anomalyco/opencode))
 - Node.js 20+ and Bun
 
 ### Installation
@@ -361,7 +361,7 @@ pkill opencode && opencode
 
 ## Credits
 
-- **OpenCode**: https://opencode.ai
+- **OpenCode**: https://opencode.ai ([GitHub](https://github.com/anomalyco/opencode))
 - **NixOS**: https://nixos.org
 - **Perplexica**: https://github.com/ItzCrazyKns/Perplexica
 - **SearXNG**: https://github.com/searxng/searxng

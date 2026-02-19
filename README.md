@@ -197,5 +197,5 @@ Autonomous execution with checkpoint-based progress:
 
 ### Infrastructure
 - [NixOS](https://nixos.org/) - Service deployment ([GitHub](https://github.com/NixOS/nix))
-- [OpenCode](https://opencode.ai/) - AI coding interface
+- [OpenCode](https://opencode.ai/) - AI coding interface ([GitHub](https://github.com/anomalyco/opencode))
 - [oh-my-opencode-slim](https://ohmyopencodeslim.com) - Agent framework for custom agents ([GitHub](https://github.com/alvinunreal/oh-my-opencode-slim))
