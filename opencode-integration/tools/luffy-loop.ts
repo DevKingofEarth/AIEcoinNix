@@ -17,6 +17,16 @@ interface IterationMetrics {
   timestamp: string;
 }
 
+interface InterventionPlan {
+  totalTodos: number;
+  todosPerIteration: number;
+  iterationsNeeded: number;
+  oracleInterventions: number[];
+  userInterventions: number[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface LoopState {
   active: boolean;
   paused: boolean;
@@ -28,15 +38,19 @@ interface LoopState {
   startedAt: string;
   lastCheckpoint: number;
   lastIterationAt: string;
-  // NEW: Dynamic checkpoint fields
+  // Intervention plan from Oracle Phase 1
+  interventionPlan: InterventionPlan | null;
+  // Dynamic checkpoint fields
   metrics: IterationMetrics[];
-  oracleDecision: 'CONTINUE' | 'PAUSE' | 'TERMINATE' | null;
+  oracleDecision: 'CONTINUE' | 'PAUSE' | 'ADJUST' | 'TERMINATE' | null;
   oracleDecisionAt: string | null;
   oracleDecisionReason: string | null;
   nextCheckpointAt: number;
   progressRate: number;
   errorRate: number;
   convergenceScore: number;
+  // Completed TODOs tracking
+  completedTodos: string[];
 }
 
 const DEFAULT_STATE: LoopState = {
@@ -50,7 +64,9 @@ const DEFAULT_STATE: LoopState = {
   startedAt: "",
   lastCheckpoint: 0,
   lastIterationAt: "",
-  // NEW: Dynamic checkpoint defaults
+  // Intervention plan defaults
+  interventionPlan: null,
+  // Dynamic checkpoint defaults
   metrics: [],
   oracleDecision: null,
   oracleDecisionAt: null,
@@ -58,7 +74,8 @@ const DEFAULT_STATE: LoopState = {
   nextCheckpointAt: 5,
   progressRate: 0,
   errorRate: 0,
-  convergenceScore: 0
+  convergenceScore: 0,
+  completedTodos: []
 };
 
 function loadState(): LoopState {
@@ -138,34 +155,34 @@ function calculateNextCheckpointInterval(state: LoopState): number {
 }
 
 export default tool({
-  description: `🦓 Luffy Loop - Autonomous executor with dynamic checkpoints.
+  description: `🦓 Luffy Loop - Autonomous executor with intervention planning.
 
 **Commands:**
-- start: Begin loop with checkpoint reviews
+- start: Begin loop with intervention plan
 - status: Show progress and metrics
-- iterate: Advance one iteration
+- iterate: Advance one iteration (pauses at intervention points)
 - pause: Pause for Oracle review
 - resume: Continue after Oracle decision
 - terminate: Stop completely
-- update_metrics: Record iteration metrics (Builder uses this)
-- check_checkpoint: Check if checkpoint reached
+- update_metrics: Record iteration metrics
+- check_checkpoint: Check if at intervention point
 - get_decision: Read Oracle's decision from state
-- set_decision: Write Oracle's decision (Oracle uses this)
+- set_decision: Write Oracle's decision
 
 **Features:**
-- Dynamic checkpoint intervals based on progress
+- Intervention planning (Oracle + User intervention points)
+- Dynamic checkpoint intervals
 - Metrics tracking: files changed, errors, tests
 - State-driven protocol (survives restarts)
-- Oracle decisions persisted to state
 
 **Workflow:**
-1. @luffy_loop command=start prompt="..."
-2. Builder: @luffy_loop command=update_metrics ...
-3. Builder: @luffy_loop command=iterate
-4. At checkpoint: Auto-pause, invoke @oracle
-5. Oracle: @luffy_loop command=set_decision decision=CONTINUE
-6. Builder: @luffy_loop command=get_decision
-7. If CONTINUE: @luffy_loop command=resume`,
+1. @oracle Phase 1: Create intervention plan
+2. @luffy_loop start with plan
+3. Builder: Do work → update_metrics → iterate
+4. At intervention: Auto-pause, invoke @oracle
+5. Oracle: Reviews → set_decision
+6. Builder: resume
+7. On completion: @oracle verify`,
 
   args: {
     command: tool.schema.enum([
@@ -187,7 +204,7 @@ export default tool({
     testsFailed: tool.schema.number().default(0).optional().describe("Tests failed"),
     iterationDuration: tool.schema.number().default(0).optional().describe("Duration in ms"),
     // set_decision args
-    decision: tool.schema.enum(["CONTINUE", "PAUSE", "TERMINATE"]).optional()
+    decision: tool.schema.enum(["CONTINUE", "PAUSE", "ADJUST", "TERMINATE"]).optional()
       .describe("Oracle's decision"),
     reason: tool.schema.string().optional().describe("Reason for decision")
   },
@@ -234,7 +251,7 @@ export default tool({
   },
 
   async startLoop(prompt: string, maxIterations: number, checkpointInterval: number, completionPromise: string) {
-    const state = loadState();
+    let state = loadState();
     
     if (state.active) {
       return `**Loop already active**
@@ -246,36 +263,55 @@ Status: ${state.paused ? "Paused" : "Running"}
 Use @luffy_loop command=status to check progress, or terminate first.`;
     }
 
+    // Check if intervention plan exists
+    const hasInterventionPlan = state.interventionPlan !== null;
+    const iterationsToUse = hasInterventionPlan ? state.interventionPlan!.iterationsNeeded : maxIterations;
+    const firstCheckpoint = hasInterventionPlan 
+      ? (state.interventionPlan!.oracleInterventions[0] || iterationsToUse)
+      : checkpointInterval;
+
     const newState: LoopState = {
       ...DEFAULT_STATE,
       active: true,
       paused: false,
       iteration: 0,
-      maxIterations,
-      checkpointInterval,
+      maxIterations: iterationsToUse,
+      checkpointInterval: hasInterventionPlan ? firstCheckpoint : checkpointInterval,
       completionPromise,
       prompt,
       startedAt: new Date().toISOString(),
-      nextCheckpointAt: checkpointInterval
+      nextCheckpointAt: firstCheckpoint,
+      interventionPlan: hasInterventionPlan ? state.interventionPlan : null,
+      completedTodos: []
     };
     
     saveState(newState);
 
+    const planInfo = hasInterventionPlan
+      ? `
+**Intervention Plan:**
+- Total TODOs: ${state.interventionPlan!.totalTodos}
+- Iterations: ${state.interventionPlan!.iterationsNeeded}
+- Oracle interventions: [${state.interventionPlan!.oracleInterventions.join(", ")}]
+- User interventions: [${state.interventionPlan!.userInterventions.join(", ")}]`
+      : "";
+
     return `**🦓 Luffy Loop Started**
 
 **Task:** ${prompt}
-**Max Iterations:** ${maxIterations}
-**Initial Checkpoint:** At iteration ${checkpointInterval}
+**Max Iterations:** ${iterationsToUse}
+**First Intervention:** At iteration ${firstCheckpoint}
 **Completion Signal:** <promise>${completionPromise}</promise>
-**State File:** ~/.config/opencode/.state/luffy-loop.json
+**State File:** ~/.config/opencode/.state/luffy-loop.json${planInfo}
 
 **Protocol:**
-1. Builder: update_metrics after each iteration
-2. Builder: iterate to advance
-3. At checkpoint: Auto-pause, invoke @oracle
-4. Oracle: set_decision with next checkpoint
+1. Builder: Do work → update_metrics → iterate
+2. At intervention: Auto-pause, invoke @oracle
+3. Oracle: Reviews → set_decision
+4. Builder: resume
+5. On completion: @oracle verify
 
-**Next:** Builder executes first iteration, then calls update_metrics + iterate.`;
+**Next:** Builder executes first iteration.`;
   },
 
   async status() {
@@ -350,18 +386,69 @@ Actions:
     }
 
     if (state.iteration >= state.maxIterations) {
-      return `**Max iterations reached**
+      // Check if we have an intervention plan for completion
+      if (state.interventionPlan) {
+        // Check if this is a user intervention point (completion)
+        const isUserIntervention = state.interventionPlan.userInterventions.includes(state.iteration);
+        if (isUserIntervention) {
+          state.paused = true;
+          saveState(state);
+          
+          return JSON.stringify({
+            __type: "CHECKPOINT_SIGNAL",
+            iteration: state.iteration,
+            maxIterations: state.maxIterations,
+            interventionType: "user",
+            prompt: state.prompt,
+            paused: true,
+            metrics: {
+              progressRate: state.progressRate,
+              errorRate: state.errorRate,
+              convergenceScore: state.convergenceScore,
+              filesChanged: state.metrics.slice(-state.checkpointInterval).reduce((s,m) => s + m.filesChanged, 0),
+              filesModified: state.metrics.slice(-state.checkpointInterval).reduce((s,m) => s + m.filesModified, 0),
+              errorsEncountered: state.metrics.slice(-state.checkpointInterval).reduce((s,m) => s + m.errorsEncountered, 0)
+            },
+            action: "INVOKE_ORACLE",
+            message: `**Completion milestone reached!** Iteration ${state.iteration}/${state.maxIterations}. Loop paused for user notification.`
+          }, null, 2);
+        }
+      }
+      
+      // All iterations complete
+      return `**✅ All iterations complete!**
 
 Iteration: ${state.iteration}/${state.maxIterations}
-Terminate or extend the loop.`;
+
+<promise>DONE</promise>
+
+**Next:** Delegate to @oracle for verification.`;
     }
 
     // Advance iteration
     state.iteration += 1;
     state.lastIterationAt = new Date().toISOString();
     
-    // Check if at checkpoint (using dynamic nextCheckpointAt)
-    if (state.iteration >= state.nextCheckpointAt) {
+    // Check if at intervention point (Oracle or User)
+    let interventionType: "oracle" | "user" | null = null;
+    
+    if (state.interventionPlan) {
+      // Check Oracle intervention points
+      if (state.interventionPlan.oracleInterventions.includes(state.iteration)) {
+        interventionType = "oracle";
+      }
+      // Check User intervention points
+      else if (state.interventionPlan.userInterventions.includes(state.iteration)) {
+        interventionType = "user";
+      }
+    }
+    
+    // Also check dynamic checkpoint (fallback)
+    if (!interventionType && state.iteration >= state.nextCheckpointAt) {
+      interventionType = "oracle";
+    }
+    
+    if (interventionType) {
       state.paused = true;
       state.lastCheckpoint = state.iteration;
       
@@ -373,12 +460,13 @@ Terminate or extend the loop.`;
       
       saveState(state);
       
-      // Return structured signal with metrics
+      // Return structured signal with intervention type
       return JSON.stringify({
         __type: "CHECKPOINT_SIGNAL",
         iteration: state.iteration,
         maxIterations: state.maxIterations,
         nextCheckpointAt: state.nextCheckpointAt,
+        interventionType: interventionType,
         prompt: state.prompt,
         paused: true,
         metrics: {
@@ -389,8 +477,10 @@ Terminate or extend the loop.`;
           filesModified: state.metrics.slice(-state.checkpointInterval).reduce((s,m) => s + m.filesModified, 0),
           errorsEncountered: state.metrics.slice(-state.checkpointInterval).reduce((s,m) => s + m.errorsEncountered, 0)
         },
-        action: "INVOKE_ORACLE",
-        message: `**Checkpoint ${state.iteration} reached!** Loop paused for Oracle review.`
+        action: interventionType === "user" ? "NOTIFY_USER" : "INVOKE_ORACLE",
+        message: interventionType === "user" 
+          ? `**User Intervention Point ${state.iteration}!** Loop paused for user notification.`
+          : `**Checkpoint ${state.iteration} reached!** Loop paused for Oracle review.`
       }, null, 2);
     }
     
@@ -399,7 +489,11 @@ Terminate or extend the loop.`;
     return `**Iteration ${state.iteration}/${state.maxIterations}**
 
 Progress: ${Math.round((state.iteration/state.maxIterations)*100)}%
-Next checkpoint: At iteration ${state.nextCheckpointAt}
+Next intervention: At iteration ${state.interventionPlan ? 
+  (state.interventionPlan.oracleInterventions.find(i => i > state.iteration) || 
+   state.interventionPlan.userInterventions.find(i => i > state.iteration) || 
+   state.maxIterations) : 
+  state.nextCheckpointAt}
 
 **Next:** 
 - Do work
@@ -453,10 +547,26 @@ Start a loop first: @luffy_loop command=start prompt="..."`;
 Iteration: ${state.iteration}/${state.maxIterations}`;
     }
 
-    // Calculate next checkpoint interval based on metrics
-    const nextInterval = calculateNextCheckpointInterval(state);
+    // Calculate next checkpoint interval
+    let nextInterval: number;
+    
+    if (state.interventionPlan) {
+      // Use pre-planned intervention points
+      const nextOracle = state.interventionPlan.oracleInterventions.find(i => i > state.iteration);
+      if (nextOracle) {
+        nextInterval = nextOracle - state.iteration;
+        state.nextCheckpointAt = nextOracle;
+      } else {
+        nextInterval = 1;
+        state.nextCheckpointAt = state.iteration + 1;
+      }
+    } else {
+      // Fallback to dynamic calculation
+      nextInterval = calculateNextCheckpointInterval(state);
+      state.nextCheckpointAt = state.iteration + nextInterval;
+    }
+    
     state.checkpointInterval = nextInterval;
-    state.nextCheckpointAt = state.iteration + nextInterval;
     state.paused = false;
     
     // Clear Oracle decision after acting on it

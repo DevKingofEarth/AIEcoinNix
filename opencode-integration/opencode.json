@@ -12,12 +12,13 @@
   "agent": {
     "builder": {
       "mode": "primary",
-      "description": "🔧 Implementation engine powered by Ralphy-wiggum with Oracle strategic oversight",
+      "description": "🔧 Implementation engine - delegates to Oracle for strategy, executes Luffy Loop, handles interventions",
       "temperature": 0.1,
       "tools": {
         "write": true,
         "edit": true,
-        "bash": true
+        "bash": true,
+        "question": true
       },
       "permission": {
         "bash": {
@@ -29,7 +30,12 @@
           "kill .*opencode": "deny"
         },
         "edit": "allow",
-        "write": "allow"
+        "write": "allow",
+        "question": "allow",
+        "tool": {
+          "oracle-control": "deny",
+          "luffy-loop": "allow"
+        }
       }
     },
     "planner": {
@@ -74,17 +80,23 @@
     },
     "oracle": {
       "mode": "subagent",
-      "description": "🔮 Strategic technical advisor for architecture, debugging, and engineering guidance",
+      "description": "🔮 Strategic execution conductor - Analyzes plans, manages Luffy Loop with intervention planning, verifies completion",
       "temperature": 0.1,
       "tools": {
         "write": false,
         "edit": false,
-        "bash": false
+        "bash": false,
+        "question": true
       },
       "permission": {
         "bash": "deny",
         "edit": "deny",
-        "write": "deny"
+        "write": "deny",
+        "question": "allow",
+        "tool": {
+          "oracle-control": "allow",
+          "luffy-loop": "allow"
+        }
       }
     },
     "librarian": {
