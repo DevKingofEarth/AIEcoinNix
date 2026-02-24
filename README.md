@@ -156,7 +156,6 @@ Autonomous execution with checkpoint-based progress:
 **Role:** Creates implementation plans
 
 **Subagents:**
-- **@oracle**: Strategic advice
 - **@librarian**: Research with @local-web
 
 **Tools:**
@@ -170,7 +169,6 @@ Autonomous execution with checkpoint-based progress:
 
 **Subagents:**
 - **@oracle**: Checkpoint reviews
-- **@librarian**: Documentation lookup
 
 **Tools:**
 - **/luffy_loop**: Autonomous execution
