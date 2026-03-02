@@ -23,6 +23,7 @@
       "permission": {
         "bash": {
           "*": "allow",
+          "git push *": "ask",
           "pkill opencode": "deny",
           "kill": "deny",
           "pkill": "deny",
@@ -50,6 +51,7 @@
       "permission": {
         "bash": {
           "*": "ask",
+          "git push *": "deny",
           "grep *": "allow",
           "cat *": "allow",
           "head *": "allow",
