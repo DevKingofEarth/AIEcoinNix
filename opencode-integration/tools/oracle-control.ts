@@ -247,6 +247,8 @@ export default tool({
     // set_intervention_plan args
     totalTodos: tool.schema.number().optional().describe("Total number of TODOs"),
     todosPerIteration: tool.schema.number().optional().describe("TODOs per iteration (default: 3)"),
+    oracleInterventions: tool.schema.array(tool.schema.number()).optional().describe("Custom Oracle intervention points (e.g., [2, 4, 6])"),
+    userInterventions: tool.schema.array(tool.schema.number()).optional().describe("Custom User intervention points (e.g., [5])"),
     // set_decision args
     decision: tool.schema.enum(["CONTINUE", "PAUSE", "ADJUST", "TERMINATE"]).optional()
       .describe("Decision: CONTINUE, PAUSE, ADJUST, or TERMINATE"),
@@ -271,7 +273,7 @@ export default tool({
     
     switch (action) {
       case "set_intervention_plan":
-        return this.setInterventionPlan(totalTodos!, todosPerIteration || 3);
+        return this.setInterventionPlan(totalTodos!, todosPerIteration || 3, oracleInterventions, userInterventions);
       case "get_intervention_plan":
         return this.getInterventionPlan();
       case "calculate_iterations":
@@ -305,7 +307,7 @@ export default tool({
   // PHASE 1: INTERVENTION PLANNING
   // =========================================================================
 
-  setInterventionPlan(totalTodos: number, todosPerIteration: number) {
+  setInterventionPlan(totalTodos: number, todosPerIteration: number, customOracleInterventions?: number[], customUserInterventions?: number[]) {
     let state = loadState();
     
     // Create new state if none exists
@@ -338,8 +340,37 @@ export default tool({
     // Calculate iterations needed
     const iterationsNeeded = calculateIterations(totalTodos, todosPerIteration);
     
-    // Plan intervention points
-    const { oracleInterventions, userInterventions } = planInterventions(iterationsNeeded);
+    // Use custom intervention points if provided, otherwise calculate automatically
+    let oracleInterventions: number[];
+    let userInterventions: number[];
+    
+    if (customOracleInterventions && customOracleInterventions.length > 0) {
+      // Oracle provided custom points - validate and use them
+      oracleInterventions = customOracleInterventions.filter(i => i > 0 && i < iterationsNeeded);
+      // If no valid Oracle points, use defaults
+      if (oracleInterventions.length === 0) {
+        const defaultPlan = planInterventions(iterationsNeeded);
+        oracleInterventions = defaultPlan.oracleInterventions;
+      }
+    } else {
+      // Calculate default intervention points
+      const defaultPlan = planInterventions(iterationsNeeded);
+      oracleInterventions = defaultPlan.oracleInterventions;
+    }
+    
+    if (customUserInterventions && customUserInterventions.length > 0) {
+      // Oracle provided custom user points - validate and use them
+      userInterventions = customUserInterventions.filter(i => i > 0 && i <= iterationsNeeded);
+      // If no valid user points, use defaults
+      if (userInterventions.length === 0) {
+        const defaultPlan = planInterventions(iterationsNeeded);
+        userInterventions = defaultPlan.userInterventions;
+      }
+    } else {
+      // Calculate default intervention points
+      const defaultPlan = planInterventions(iterationsNeeded);
+      userInterventions = defaultPlan.userInterventions;
+    }
     
     // Create intervention plan
     const plan: InterventionPlan = {
@@ -359,6 +390,10 @@ export default tool({
     
     saveState(state);
     
+    const customNote = (customOracleInterventions || customUserInterventions) 
+      ? "\n**Note:** Custom intervention points provided by Oracle." 
+      : "";
+    
     return `**Intervention Plan Created**
 
 **Total TODOs:** ${totalTodos}
@@ -367,7 +402,7 @@ export default tool({
 
 **Oracle Interventions:** [${oracleInterventions.join(", ")}]
 **User Interventions:** [${userInterventions.join(", ")}]
-
+${customNote}
 **Plan written to state.**
 **Next:** Builder executes first task, then starts Luffy Loop.`;
   },

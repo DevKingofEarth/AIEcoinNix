@@ -10,6 +10,7 @@ tools:
 permission:
   bash:
     "*": allow
+    "git push *": ask
     "pkill opencode": deny
     "kill": deny
     "pkill": deny
@@ -197,11 +198,7 @@ oracle-control action=purge_state
 **If old state exists:**
 - Check if previous task failed
 - Check `previousAttempts` for errors
-- If you want fresh start:
-
-```
-oracle-control action=purge_state
-```
+- If you want fresh start: Delegate to Oracle
 
 ### Starting the Loop
 
@@ -209,7 +206,7 @@ oracle-control action=purge_state
 @luffy_loop command=start prompt="[task]" maxIterations=[X] checkpointInterval=[Y]
 ```
 
-**Note:** X and Y should come from Oracle's intervention plan (oracle-control wrote them to state).
+**Note:** X and Y should come from Oracle's intervention plan.
 
 ---
 
@@ -218,7 +215,16 @@ oracle-control action=purge_state
 ### Normal Iteration
 
 ```
-1. DO WORK
+BEFORE Iteration:
+1. todowrite - show current TODOs for this iteration
+
+DURING Iteration:
+- Work on TODOs
+- Update todowrite as TODOs complete
+- If TODO fails → fix and continue (same iteration)
+
+AFTER Iteration:
+1. Verify all TODOs in this chunk are done
 2. @luffy_loop command=update_metrics filesChanged=X errors=Y
 3. @luffy_loop command=iterate
 ```
@@ -370,11 +376,9 @@ If failures found, factor them into your approach.
 ### @luffy_loop (Tool) - Execution Loop
 - start, iterate, update_metrics, resume, terminate, status
 
-### oracle-control (Tool)
-- set_intervention_plan, get_intervention_plan
-- set_decision, get_decision
-- purge_state, record_attempt, record_error
-- get_previous_attempts, terminate_and_clear
+### todowrite/todoread (Tool) - TODO Tracking
+- todowrite: Update current iteration TODOs
+- todoread: Show progress at checkpoints
 
 ### question (Tool)
 - Used by Oracle for user interventions
