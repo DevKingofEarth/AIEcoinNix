@@ -1,6 +1,6 @@
 # OpenCode Integration - AIEcoinNix
 
-Privacy-first AI development environment on NixOS with Luffy Loop + Bright Oracle autonomous execution.
+Privacy-first AI development environment on NixOS with Luffy Loop + Oracle autonomous execution.
 
 ## Architecture Overview
 
@@ -20,9 +20,9 @@ Privacy-first AI development environment on NixOS with Luffy Loop + Bright Oracl
 │                 PHASE 1: Strategic Analysis                   │
 │                                                              │
 │  Builder Bob delegates @oracle                                    │
-│  → Bright Oracle analyzes: problem type, complexity, TODOs         │
-│  → Bright Oracle decides: iterations, checkpoints                    │
-│  → Bright Oracle writes plan to state via oracle-control             │
+│  → Oracle analyzes: problem type, complexity, TODOs         │
+│  → Oracle decides: iterations, checkpoints                    │
+│  → Oracle writes plan to state via oracle-control             │
 │  → Builder Bob updates plan file with iteration grouping          │
 └─────────────────────────────────────────────────────────────┘
                              │
@@ -33,7 +33,7 @@ Privacy-first AI development environment on NixOS with Luffy Loop + Bright Oracl
 │  Builder Bob (implements code, runs tests)                       │
 │       │                                                      │
 │       └── @oracle + Luffy Loop (checkpoint management)       │
-│           → Bright Oracle-planned checkpoints                       │
+│           → Oracle-planned checkpoints                       │
 │           → Human oversight at checkpoints                   │
 │                                                              │
 │  → Output: Working implementation with verification          │
@@ -72,21 +72,21 @@ cd opencode-integration
 cp tools/*.js ~/.config/opencode/tools/
 ```
 
-## Luffy Loop + Bright Oracle
+## Luffy Loop + Oracle
 
 ### What is Luffy Loop?
 
-Luffy Loop is an autonomous execution system with **Bright Oracle-planned checkpoints**:
+Luffy Loop is an autonomous execution system with **Oracle-planned checkpoints**:
 
 - **Autonomous iterations** - Execute tasks until checkpoint
 - **State persistence** - Progress saved to `~/.config/opencode/.state/sessions/{session-id}.json`
-- **Planned checkpoints** - Bright Oracle decides iterations and checkpoints in Phase 1
-- **Bright Oracle oversight** - Reviews at every checkpoint
+- **Planned checkpoints** - Oracle decides iterations and checkpoints in Phase 1
+- **Oracle oversight** - Reviews at every checkpoint
 - **Progress tracking** - completedTodos tracked in state
 
-### Bright Oracle's Role
+### Oracle's Role
 
-Bright Oracle is **Builder Bob's strategic advisor** (not NerdPlanner). It:
+Oracle is **Builder Bob's strategic advisor** (not NerdPlanner). It:
 
 - **Phase 1:** Analyzes IMPLEMENTATION_PLAN.md, decides complexity, iterations, checkpoints
 - **Phase 3:** Analyzes checkpoint metrics, makes decisions
@@ -96,7 +96,7 @@ Bright Oracle is **Builder Bob's strategic advisor** (not NerdPlanner). It:
 
 ### Problem Analysis (Phase 1)
 
-Bright Oracle analyzes IMPLEMENTATION_PLAN.md and decides:
+Oracle analyzes IMPLEMENTATION_PLAN.md and decides:
 
 | Complexity | TODOs | todosPerIteration | Checkpoints |
 |------------|-------|------------------|-------------|
@@ -173,7 +173,7 @@ PHASE 4 - Verification:
 # Terminate loop
 @luffy_loop command=terminate
 
-# Get Bright Oracle decision from state
+# Get Oracle decision from state
 @luffy_loop command=get_decision
 ```
 
@@ -202,13 +202,13 @@ oracle-control action=status
 # Output: Research findings with source URLs
 ```
 
-### Builder Bob + Bright Oracle (Execution Phase)
+### Builder Bob + Oracle (Execution Phase)
 
 ```bash
-# Phase 1 - Builder Bob delegates Bright Oracle for analysis
+# Phase 1 - Builder Bob delegates Oracle for analysis
 @oracle "Analyze IMPLEMENTATION_PLAN.md"
 
-# Bright Oracle returns:
+# Oracle returns:
 # - Problem Type: Sequential
 # - Complexity: Medium
 # - totalIterations: 3
@@ -222,7 +222,7 @@ oracle-control action=status
 # At checkpoint
 @oracle "Checkpoint 2 reached"
 
-# Bright Oracle reviews, decides: CONTINUE/PAUSE/ADJUST/TERMINATE
+# Oracle reviews, decides: CONTINUE/PAUSE/ADJUST/TERMINATE
 ```
 
 ## Local Services

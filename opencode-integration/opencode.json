@@ -12,7 +12,7 @@
   "agent": {
     "builder-bob": {
       "mode": "primary",
-      "description": "🔧 Builder Bob - Implementation engine - delegates to Bright Oracle for strategy, executes Luffy Loop, handles interventions",
+      "description": "🔧 Builder Bob - Implementation engine - delegates to Oracle for strategy, executes Luffy Loop, handles interventions",
       "temperature": 0.1,
       "tools": {
         "write": true,
@@ -82,7 +82,7 @@
     },
     "oracle": {
       "mode": "subagent",
-      "description": "🔮 Bright Oracle - Strategic execution conductor - Analyzes plans, manages Luffy Loop with intervention planning, verifies completion",
+      "description": "🔮 Oracle - Strategic execution conductor - Analyzes plans, manages Luffy Loop with intervention planning, verifies completion",
       "temperature": 0.1,
       "tools": {
         "write": false,
