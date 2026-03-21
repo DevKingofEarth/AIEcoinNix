@@ -14,15 +14,26 @@ Privacy-first AI development environment on NixOS with Luffy Loop + Oracle auton
 │                                                              │
 │  → Output: IMPLEMENTATION_PLAN.md with verified sources     │
 └─────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 PHASE 1: Strategic Analysis                   │
+│                                                              │
+│  Builder delegates @oracle                                    │
+│  → Oracle analyzes: problem type, complexity, TODOs         │
+│  → Oracle decides: iterations, checkpoints                    │
+│  → Oracle writes plan to state via oracle-control             │
+│  → Builder updates plan file with iteration grouping          │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    EXECUTION PHASE                           │
 │                                                              │
 │  Builder (implements code, runs tests)                       │
 │       │                                                      │
 │       └── @oracle + Luffy Loop (checkpoint management)       │
-│           → Convergence-based dynamic intervals              │
+│           → Oracle-planned checkpoints                       │
 │           → Human oversight at checkpoints                   │
 │                                                              │
 │  → Output: Working implementation with verification          │
@@ -65,46 +76,67 @@ cp tools/*.js ~/.config/opencode/tools/
 
 ### What is Luffy Loop?
 
-Luffy Loop is an autonomous execution system with **convergence-based dynamic checkpoints**:
+Luffy Loop is an autonomous execution system with **Oracle-planned checkpoints**:
 
 - **Autonomous iterations** - Execute tasks until checkpoint
-- **State persistence** - Progress saved to `~/.config/opencode/.state/luffy-loop.json`
-- **Dynamic intervals** - Checkpoint interval adapts based on progress (1-7 iterations)
+- **State persistence** - Progress saved to `~/.config/opencode/.state/sessions/{session-id}.json`
+- **Planned checkpoints** - Oracle decides iterations and checkpoints in Phase 1
 - **Oracle oversight** - Reviews at every checkpoint
-
-### Dynamic Checkpoint Intervals
-
-Oracle calculates next checkpoint based on convergence score:
-
-| Convergence Score | Interval | Meaning |
-|-------------------|----------|---------|
-| > 2.0 | 7 | Excellent progress - check less |
-| 1.0 - 2.0 | 5 | Good progress - standard |
-| 0.5 - 1.0 | 3 | Slow progress - more checks |
-| < 0.5 | 2 | Poor progress - frequent |
-| 0 (stuck) | 1 | No progress - immediate |
+- **Progress tracking** - completedTodos tracked in state
 
 ### Oracle's Role
 
-Oracle is **Builder-only** (not Planner). It:
+Oracle is **Builder's strategic advisor** (not Planner). It:
 
-- **Analyzes checkpoint metrics** - progressRate, errorRate, convergenceScore
-- **DECIDES**: continue / pause / terminate
-- **Stops wrong direction** - Terminates loops going off-track
-- **Protects free tier** - Terminates wasteful iterations
-- **Escalates to user** - When uncertain
+- **Phase 1:** Analyzes IMPLEMENTATION_PLAN.md, decides complexity, iterations, checkpoints
+- **Phase 3:** Analyzes checkpoint metrics, makes decisions
+- **Phase 4:** Verifies completion against plan
+- **DECIDES:** continue / pause / adjust / terminate
+- **Escalates to user** - When user input needed at checkpoints
+
+### Problem Analysis (Phase 1)
+
+Oracle analyzes IMPLEMENTATION_PLAN.md and decides:
+
+| Complexity | TODOs | todosPerIteration | Checkpoints |
+|------------|-------|------------------|-------------|
+| Trivial | 1-2 | Direct | None |
+| Simple | 3-5 | 2-3 | 1-2 |
+| Medium | 6-12 | 3-4 | 2-3 |
+| Complex | 13-25 | 2-3 | 3-4 |
+| Epic | 25+ | 1-2 | 4+ |
 
 ### Workflow
 
 ```
-1. Builder: @luffy_loop command=start prompt="..." maxIterations=15
-2. Builder: @luffy_loop command=iterate (repeatedly)
-3. Checkpoint reached → Loop auto-pauses → CHECKPOINT_SIGNAL
-4. Builder: @oracle "Checkpoint X reached. What should I do?"
-5. @oracle: Analyzes metrics, returns decision with reasoning
-6. Builder: @luffy_loop command=set_decision decision=CONTINUE reason="..."
-7. Builder: @luffy_loop command=resume
-8. Repeat until complete
+PHASE 1 - Analysis:
+1. Builder: Read IMPLEMENTATION_PLAN.md
+2. Builder: @oracle "Analyze plan"
+3. @oracle: Analyzes, returns TODO sequence
+4. @oracle: Calls oracle-control set_intervention_plan
+5. Builder: Updates plan file with iteration grouping
+6. Builder: @luffy_loop command=start
+
+PHASE 2 - Execution:
+1. Builder: todowrite for current iteration TODOs
+2. Builder: Execute work
+3. Builder: @luffy_loop command=update_metrics filesChanged=X errors=Y
+4. Builder: @luffy_loop command=complete_todos completedTodos=["TODO 1", "TODO 2"]
+5. Builder: @luffy_loop command=iterate
+6. Repeat until checkpoint
+
+PHASE 3 - Checkpoint:
+1. Checkpoint reached → Loop pauses
+2. Builder: @oracle "Checkpoint reached"
+3. @oracle: Reviews metrics, uses question tool if user needed
+4. @oracle: Calls oracle-control set_decision
+5. Builder: @luffy_loop command=resume
+
+PHASE 4 - Verification:
+1. All iterations complete
+2. Builder: @oracle "Verify completion"
+3. @oracle: Compares against plan, reports result
+4. Builder: @luffy_loop command=terminate
 ```
 
 **Critical:** Builder NEVER uses oracle-control directly. Only @oracle subagent does.
@@ -115,23 +147,19 @@ Oracle is **Builder-only** (not Planner). It:
 - `filesModified` - Existing files edited
 - `errorsEncountered` - Errors/exceptions
 - `testsPassed` / `testsFailed` - Test results
+- `completedTodos` - TODOs completed this iteration
 
-**Calculated by Tool:**
-- `progressRate` = files per iteration
-- `errorRate` = errors per iteration
-- `convergenceScore` = progressRate / (errorRate + 1)
-
-### Commands
+### @luffy_loop Commands
 
 ```bash
-# Start a loop
-@luffy_loop command=start prompt="Build authentication API" maxIterations=15 checkpointInterval=5
+# Start a loop (reads plan from state)
+@luffy_loop command=start
 
 # Record metrics after work
 @luffy_loop command=update_metrics filesChanged=2 filesModified=1 errorsEncountered=0
 
-# Check if at checkpoint
-@luffy_loop command=check_checkpoint
+# Mark TODOs as completed
+@luffy_loop command=complete_todos completedTodos=["Configure X", "Setup Y"]
 
 # Advance iteration
 @luffy_loop command=iterate
@@ -139,17 +167,30 @@ Oracle is **Builder-only** (not Planner). It:
 # Check status
 @luffy_loop command=status
 
-# Resume loop (after @oracle says CONTINUE)
+# Resume loop (after @oracle decision)
 @luffy_loop command=resume
 
-# Terminate loop (after @oracle says TERMINATE)
+# Terminate loop
 @luffy_loop command=terminate
 
 # Get Oracle decision from state
 @luffy_loop command=get_decision
+```
 
-# Write Oracle decision to state
-@luffy_loop command=set_decision decision=CONTINUE reason="Good progress"
+### @oracle Actions (via oracle-control)
+
+```bash
+# Phase 1 - Write intervention plan
+oracle-control action=set_intervention_plan totalIterations=6 oracleCheckpoints=[2,4] userCheckpoints=[3,6] totalTodos=15
+
+# Phase 3 - Set decision
+oracle-control action=set_decision decision=CONTINUE reason="On track"
+
+# Phase 4 - Verify completion
+oracle-control action=verify
+
+# Get current status
+oracle-control action=status
 ```
 
 ### Planner + Librarian (Research Phase)
@@ -164,33 +205,25 @@ Oracle is **Builder-only** (not Planner). It:
 ### Builder + Oracle (Execution Phase)
 
 ```bash
-# At checkpoint, Builder invokes Oracle
-@oracle "Checkpoint 5/10 reached. Convergence: 2.5. Continue?"
+# Phase 1 - Builder delegates Oracle for analysis
+@oracle "Analyze IMPLEMENTATION_PLAN.md"
 
-# Oracle returns decision:
-# Decision: CONTINUE
-# Next Checkpoint: Iteration 10 (interval: 5)
-# Reason: Convergence score 2.5 indicates good progress
+# Oracle returns:
+# - Problem Type: Sequential
+# - Complexity: Medium
+# - totalIterations: 3
+# - oracleCheckpoints: [2]
+# - userCheckpoints: [3]
+# - TODO Sequence: [list of todos]
 
-# Builder then:
-@luffy_loop command=set_decision decision=CONTINUE reason="Convergence: 2.5"
-@luffy_loop command=resume
+# Builder then updates plan file, starts loop
+@luffy_loop command=start
+
+# At checkpoint
+@oracle "Checkpoint 2 reached"
+
+# Oracle reviews, decides: CONTINUE/PAUSE/ADJUST/TERMINATE
 ```
-
-### Workflow
-
-```
-1. Builder starts: @luffy_loop command=start prompt="..."
-2. Luffy iterates: @luffy_loop command=iterate
-3. Checkpoint reached → Loop auto-pauses → CHECKPOINT_SIGNAL
-4. Builder invokes: @oracle "Checkpoint X reached. What should I do?"
-5. @oracle internally uses /oracle_control, decides: CONTINUE/PAUSE/TERMINATE
-6. @oracle returns decision with reasoning
-7. Builder executes: /luffy_loop command=resume (or terminate)
-8. Repeat until complete
-```
-
-**Critical:** Builder NEVER uses /oracle_control directly. Only @oracle subagent uses it internally.
 
 ## Local Services
 

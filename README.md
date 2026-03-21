@@ -1,199 +1,274 @@
-# 🧠 SmartAssist - AI-Assisted Development Setup
+# OpenCode Integration - AIEcoinNix
 
-Self-hosted services and OpenCode configuration for AI-assisted development.
+Privacy-first AI development environment on NixOS with Luffy Loop + Oracle autonomous execution.
 
-## 🏗️ Project Architecture
-
-### Services
-Written in nix, are the list of systemd services
-- Web Parser (port 18090): Content extraction - used by Opencode.
-- SearXNG (port 18081): Meta-search engine - used by Perplexica.
-- Perplexica (port 3000): AI research (browser-based).
-
-### OpenCode Setup
-Configured with local services for AI-assisted development
-- Uses /local-web tool for web search
-- /local-web connects to Web Parser (port 18090)
-And other custom agents as well.
-
-## 📁 Project Structure
+## Architecture Overview
 
 ```
-AIEcoinNix/
-├── smartassist.nix          # NixOS module
-├── smartassist.nix.example  # Template (replace secrets before using)
-├── README.md                # This file
-├── .opencode/               # OpenCode configuration (global)
-│   ├── opencode.json        # Main config
-│   ├── agents/              # Agent definitions
-│   │   ├── builder.md
-│   │   ├── planner.md
-│   │   ├── oracle.md
-│   │   ├── librarian.md
-│   │   ├── designer.md
-│   │   ├── fixer.md
-│   │   ├── researcher.md
-│   │   └── search-helper.md
-│   └── tools/               # Tool implementations
-│       ├── luffy-loop.ts
-│       ├── oracle-control.ts
-│       ├── local-web.ts
-│       └── lsp/             # LSP code analysis tools
-└── opencode-integration/    # Backup/portable OpenCode setup
-    ├── opencode.json        # Main configuration
-    ├── agents/              # Agent definitions (.md)
-    ├── tools/               # Tool implementations
-    │   ├── *.ts            # TypeScript source (IN REPO)
-    │   ├── *.js            # Compiled (GENERATED, NOT IN REPO)
-    │   └── lsp/            # LSP tools (7 .ts files)
-    ├── tools/luffyg5.jpg   # Luffy Loop architecture diagram
-    └── build.sh             # Build script (compile TS → JS)
+┌─────────────────────────────────────────────────────────────┐
+│                    PLANNING PHASE                            │
+│                                                              │
+│  Planner (analyzes requirements, creates plans)              │
+│       │                                                      │
+│       └── @librarian (research with source URLs)             │
+│                                                              │
+│  → Output: IMPLEMENTATION_PLAN.md with verified sources     │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 PHASE 1: Strategic Analysis                   │
+│                                                              │
+│  Builder delegates @oracle                                    │
+│  → Oracle analyzes: problem type, complexity, TODOs         │
+│  → Oracle decides: iterations, checkpoints                    │
+│  → Oracle writes plan to state via oracle-control             │
+│  → Builder updates plan file with iteration grouping          │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    EXECUTION PHASE                           │
+│                                                              │
+│  Builder (implements code, runs tests)                       │
+│       │                                                      │
+│       └── @oracle + Luffy Loop (checkpoint management)       │
+│           → Oracle-planned checkpoints                       │
+│           → Human oversight at checkpoints                   │
+│                                                              │
+│  → Output: Working implementation with verification          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## 🛠️ Services
+## Key Principles
 
-Self-hosted services managed by NixOS:
+1. **Separation of Concerns**: Planner researches, Builder implements
+2. **Ambiguity Guard**: Planner asks clarification for vague requests
+3. **Source Citations**: All research includes URLs for verification
+4. **Gell-Mann Resistance**: Transparency over blind trust
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| Perplexica | 3000 | AI research (browser-based) |
-| SearXNG | 18081 | Meta-search for private web search |
-| Web Parser | 18090 | Content extraction for /local-web |
+---
 
-## 📦 Service File
+## Ambiguity Guard
 
-The `smartassist.nix` module provides systemd services for your AI development environment.
+Planner prevents token waste by ensuring requirements are clear before planning:
 
-**Usage Options:**
-- **NixOS Flake:** Import or include in `flake.nix`
-- **Home Manager:** Import in `home.nix`
-- **Standalone NixOS:** Import in `configuration.nix`
-- **Manual Setup:** Use as reference to create your own `smartassist.service` systemd unit or shell script
+- **Obvious requests** (factual, simple creative) → Skip to planning
+- **Complex/ambiguous requests** → Ask clarification questions
+- **Hardware feasibility** → Warn if graphics/compute exceeds laptop constraints
 
-**Included Services:**
-- `ollama.service` - Local LLM inference
-- `searx.service` - Private meta-search engine
-- `perplexica.service` - AI research interface
-- `web-parser.service` - Content extraction for /local-web
+---
 
-**Example Imports:**
-```nix
-# In flake.nix
-smartassist.nix
+## Tools
 
-# In home.nix
-imports = [ ./smartassist.nix ];
+All tools are TypeScript source files (`.ts`). Build to JavaScript for OpenCode.
 
-# In configuration.nix
-imports = [ /path/to/smartassist.nix ];
+```bash
+# Build all tools
+cd opencode-integration
+./build.sh
+
+# Copy to OpenCode config
+cp tools/*.js ~/.config/opencode/tools/
 ```
 
-**Note:** Replace placeholder values (`$OLLAMA_USER`, `$PERPLEXICA_PATH`, `$SEARXNG_SECRET`) before using.
+## Luffy Loop + Oracle
 
-## 🤖 Agent System
+### What is Luffy Loop?
 
-### Primary Agents (Tab to switch)
+Luffy Loop is an autonomous execution system with **Oracle-planned checkpoints**:
 
-| Agent | Role |
-|-------|------|
-| **Planner** | Creates implementation plans |
-| **Builder** | Implements code |
+- **Autonomous iterations** - Execute tasks until checkpoint
+- **State persistence** - Progress saved to `~/.config/opencode/.state/sessions/{session-id}.json`
+- **Planned checkpoints** - Oracle decides iterations and checkpoints in Phase 1
+- **Oracle oversight** - Reviews at every checkpoint
+- **Progress tracking** - completedTodos tracked in state
 
-### Subagents (@Mention to invoke)
+### Oracle's Role
 
-| Agent | Role |
-|-------|------|
-| **@oracle** | Strategic controller |
-| **@librarian** | Research specialist |
-| **@designer** | UI/UX specialist |
-| **@fixer** | Bug fixes |
-| **@search-helper** | Web search helper |
+Oracle is **Builder's strategic advisor** (not Planner). It:
 
-### Tools
+- **Phase 1:** Analyzes IMPLEMENTATION_PLAN.md, decides complexity, iterations, checkpoints
+- **Phase 3:** Analyzes checkpoint metrics, makes decisions
+- **Phase 4:** Verifies completion against plan
+- **DECIDES:** continue / pause / adjust / terminate
+- **Escalates to user** - When user input needed at checkpoints
 
-| Tool | Purpose |
-|------|---------|
-| **/luffy_loop** | Autonomous execution |
-| **/oracle_control** | Oracle checkpoint reviews |
-| **/local-web** | Private web search |
-| **/lsp/** | LSP code analysis (7 tools) |
+### Problem Analysis (Phase 1)
 
----
+Oracle analyzes IMPLEMENTATION_PLAN.md and decides:
 
-## LSP Tools
+| Complexity | TODOs | todosPerIteration | Checkpoints |
+|------------|-------|------------------|-------------|
+| Trivial | 1-2 | Direct | None |
+| Simple | 3-5 | 2-3 | 1-2 |
+| Medium | 6-12 | 3-4 | 2-3 |
+| Complex | 13-25 | 2-3 | 3-4 |
+| Epic | 25+ | 1-2 | 4+ |
 
-Language Server Protocol tools for code analysis and refactoring.
+### Workflow
 
-| Tool | Purpose |
-|------|---------|
-| `/lsp/diagnostics` | Check errors, warnings, hints |
-| `/lsp/goto-definition` | Navigate to definitions |
-| `/lsp/find-references` | Find symbol references |
-| `/lsp/completion` | Code completion |
-| `/lsp/code-actions` | Quick fixes |
-| `/lsp/rename` | Safe renaming |
+```
+PHASE 1 - Analysis:
+1. Builder: Read IMPLEMENTATION_PLAN.md
+2. Builder: @oracle "Analyze plan"
+3. @oracle: Analyzes, returns TODO sequence
+4. @oracle: Calls oracle-control set_intervention_plan
+5. Builder: Updates plan file with iteration grouping
+6. Builder: @luffy_loop command=start
 
-**Used by:** @fixer for verification after code fixes
+PHASE 2 - Execution:
+1. Builder: todowrite for current iteration TODOs
+2. Builder: Execute work
+3. Builder: @luffy_loop command=update_metrics filesChanged=X errors=Y
+4. Builder: @luffy_loop command=complete_todos completedTodos=["TODO 1", "TODO 2"]
+5. Builder: @luffy_loop command=iterate
+6. Repeat until checkpoint
 
-**Implementation:** `opencode-integration/tools/lsp/`
+PHASE 3 - Checkpoint:
+1. Checkpoint reached → Loop pauses
+2. Builder: @oracle "Checkpoint reached"
+3. @oracle: Reviews metrics, uses question tool if user needed
+4. @oracle: Calls oracle-control set_decision
+5. Builder: @luffy_loop command=resume
 
----
+PHASE 4 - Verification:
+1. All iterations complete
+2. Builder: @oracle "Verify completion"
+3. @oracle: Compares against plan, reports result
+4. Builder: @luffy_loop command=terminate
+```
 
-## Luffy Loop Architecture
+**Critical:** Builder NEVER uses oracle-control directly. Only @oracle subagent does.
 
-![Luffy Loop Architecture](opencode-integration/tools/luffyg5.jpg)
+### Metrics Tracked
 
-Autonomous execution with checkpoint-based progress:
+- `filesChanged` - New files created per iteration
+- `filesModified` - Existing files edited
+- `errorsEncountered` - Errors/exceptions
+- `testsPassed` / `testsFailed` - Test results
+- `completedTodos` - TODOs completed this iteration
 
-- **Autonomous iterations** - Execute tasks until checkpoint or completion
-- **State persistence** - Progress saved to `~/.config/opencode/.state/luffy-loop.json`
-- **Oracle oversight** - Oracle reviews at every checkpoint
+### @luffy_loop Commands
 
----
+```bash
+# Start a loop (reads plan from state)
+@luffy_loop command=start
 
-### Planner Agent
+# Record metrics after work
+@luffy_loop command=update_metrics filesChanged=2 filesModified=1 errorsEncountered=0
 
-**Role:** Creates implementation plans
+# Mark TODOs as completed
+@luffy_loop command=complete_todos completedTodos=["Configure X", "Setup Y"]
 
-**Subagents:**
-- **@librarian**: Research with @local-web
+# Advance iteration
+@luffy_loop command=iterate
 
-**Tools:**
-- **/local-web**: Research with private web search
+# Check status
+@luffy_loop command=status
 
----
+# Resume loop (after @oracle decision)
+@luffy_loop command=resume
 
-### Builder Agent
+# Terminate loop
+@luffy_loop command=terminate
 
-**Role:** Implements code with autonomous execution
+# Get Oracle decision from state
+@luffy_loop command=get_decision
+```
 
-**Subagents:**
-- **@oracle**: Checkpoint reviews
+### @oracle Actions (via oracle-control)
 
-**Tools:**
-- **/luffy_loop**: Autonomous execution
-- **/oracle_control**: Oracle checkpoint reviews
+```bash
+# Phase 1 - Write intervention plan
+oracle-control action=set_intervention_plan totalIterations=6 oracleCheckpoints=[2,4] userCheckpoints=[3,6] totalTodos=15
 
----
+# Phase 3 - Set decision
+oracle-control action=set_decision decision=CONTINUE reason="On track"
 
-## 🙏 Credits
+# Phase 4 - Verify completion
+oracle-control action=verify
 
-### Web Parser Dependencies
-| Project | Purpose |
-|---------|---------|
-| [FastAPI](https://fastapi.tiangolo.com/) | Web framework ([GitHub](https://github.com/fastapi/fastapi)) |
-| [Pydantic](https://docs.pydantic.dev/) | Data validation ([GitHub](https://github.com/pydantic/pydantic)) |
-| [httpx](https://www.python-httpx.org/) | HTTP client ([GitHub](https://github.com/encode/httpx)) |
-| [BeautifulSoup](https://www.crummy.com/software/BeautifulSoup/) | HTML parsing ([GitHub](https://www.crummy.com/software/BeautifulSoup/)) |
-| [Trafilatura](https://trafilatura.readthedocs.io/en/latest/) | Web content extraction ([GitHub](https://github.com/adbar/trafilatura)) |
+# Get current status
+oracle-control action=status
+```
 
-### Services
-| Project | Purpose |
-|---------|---------|
-| [SearXNG](https://searxng.github.io/searxng/) | Privacy-respecting search ([GitHub](https://github.com/searxng/searxng)) |
-| [Perplexica](https://github.com/ItzCrazyKns/Perplexica) | AI research ([GitHub](https://github.com/ItzCrazyKns/Perplexica)) |
+### Planner + Librarian (Research Phase)
 
-### Infrastructure
-- [NixOS](https://nixos.org/) - Service deployment ([GitHub](https://github.com/NixOS/nix))
-- [OpenCode](https://opencode.ai/) - AI coding interface ([GitHub](https://github.com/anomalyco/opencode))
-- [oh-my-opencode-slim](https://ohmyopencodeslim.com) - Agent framework for custom agents ([GitHub](https://github.com/alvinunreal/oh-my-opencode-slim))
+```bash
+# Planner delegates to Librarian for research
+@librarian query='best practices for JWT authentication 2024'
+
+# Output: Research findings with source URLs
+```
+
+### Builder + Oracle (Execution Phase)
+
+```bash
+# Phase 1 - Builder delegates Oracle for analysis
+@oracle "Analyze IMPLEMENTATION_PLAN.md"
+
+# Oracle returns:
+# - Problem Type: Sequential
+# - Complexity: Medium
+# - totalIterations: 3
+# - oracleCheckpoints: [2]
+# - userCheckpoints: [3]
+# - TODO Sequence: [list of todos]
+
+# Builder then updates plan file, starts loop
+@luffy_loop command=start
+
+# At checkpoint
+@oracle "Checkpoint 2 reached"
+
+# Oracle reviews, decides: CONTINUE/PAUSE/ADJUST/TERMINATE
+```
+
+## Local Services
+
+### Web Search
+
+`/local-web` - Private local web search using SearXNG + Web Parser:
+
+```
+# Usage in OpenCode:
+/local-web query='machine learning trends' deep=true
+```
+
+## Files
+
+```
+opencode-integration/
+├── build.sh              # Build script (compile .ts → .js)
+├── opencode.json          # OpenCode configuration
+├── README.md              # This file
+├── agents/               # Agent definitions (.md)
+└── tools/
+    ├── *.ts              # TypeScript source (IN REPO)
+    └── *.js              # Compiled (GENERATED, NOT IN REPO)
+```
+
+**Note:** Only `.ts` files are committed. Build generates `.js` files.
+
+## Installation
+
+1. Build and install:
+   ```bash
+   cd opencode-integration
+   ./build.sh
+   cp tools/*.js ~/.config/opencode/tools/
+   ```
+
+2. Restart OpenCode to load new tools.
+
+## Models
+
+Available Ollama models:
+- `devstral-small-2:24b-cloud` - Primary coding model (24B)
+- `functiongemma:270m` - Function calling model (270M)
+
+## Credits
+
+- **OpenCode**: https://opencode.ai
+- **Ollama**: https://ollama.com
