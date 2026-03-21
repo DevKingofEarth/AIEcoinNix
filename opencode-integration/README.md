@@ -8,7 +8,7 @@ Privacy-first AI development environment on NixOS with Luffy Loop + Bright Oracl
 ┌─────────────────────────────────────────────────────────────┐
 │                    PLANNING PHASE                            │
 │                                                              │
-│  Nerd Planner (analyzes requirements, creates plans)              │
+│  NerdPlanner (analyzes requirements, creates plans)              │
 │       │                                                      │
 │       └── @librarian (research with source URLs)             │
 │                                                              │
@@ -42,8 +42,8 @@ Privacy-first AI development environment on NixOS with Luffy Loop + Bright Oracl
 
 ## Key Principles
 
-1. **Separation of Concerns**: Nerd Planner researches, Builder Bob implements
-2. **Ambiguity Guard**: Nerd Planner asks clarification for vague requests
+1. **Separation of Concerns**: NerdPlanner researches, Builder Bob implements
+2. **Ambiguity Guard**: NerdPlanner asks clarification for vague requests
 3. **Source Citations**: All research includes URLs for verification
 4. **Gell-Mann Resistance**: Transparency over blind trust
 
@@ -51,7 +51,7 @@ Privacy-first AI development environment on NixOS with Luffy Loop + Bright Oracl
 
 ## Ambiguity Guard
 
-Nerd Planner prevents token waste by ensuring requirements are clear before planning:
+NerdPlanner prevents token waste by ensuring requirements are clear before planning:
 
 - **Obvious requests** (factual, simple creative) → Skip to planning
 - **Complex/ambiguous requests** → Ask clarification questions
@@ -86,7 +86,7 @@ Luffy Loop is an autonomous execution system with **Bright Oracle-planned checkp
 
 ### Bright Oracle's Role
 
-Bright Oracle is **Builder Bob's strategic advisor** (not Nerd Planner). It:
+Bright Oracle is **Builder Bob's strategic advisor** (not NerdPlanner). It:
 
 - **Phase 1:** Analyzes IMPLEMENTATION_PLAN.md, decides complexity, iterations, checkpoints
 - **Phase 3:** Analyzes checkpoint metrics, makes decisions
@@ -193,10 +193,10 @@ oracle-control action=verify
 oracle-control action=status
 ```
 
-### Nerd Planner + Librarian (Research Phase)
+### NerdPlanner + Librarian (Research Phase)
 
 ```bash
-# Nerd Planner delegates to Librarian for research
+# NerdPlanner delegates to Librarian for research
 @librarian query='best practices for JWT authentication 2024'
 
 # Output: Research findings with source URLs
