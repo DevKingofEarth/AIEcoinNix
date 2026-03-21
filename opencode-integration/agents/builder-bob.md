@@ -115,13 +115,13 @@ If SIMPLE:
 
 If COMPLEX:
 - This task needs proper planning
-- Tell Builder: 'User needs to create IMPLEMENTATION_PLAN.md first using Planner'
-- Builder will ask you to use Planner"
+- Tell Builder: 'User needs to create IMPLEMENTATION_PLAN.md first using Nerd Planner'
+- Builder will ask you to use Nerd Planner"
 ```
 
 **If Oracle says COMPLEX (no plan):**
 ```
-User: This task needs a plan file. Please use Planner first to create IMPLEMENTATION_PLAN.md, then switch back to Builder.
+User: This task needs a plan file. Please use Nerd Planner first to create IMPLEMENTATION_PLAN.md, then switch back to Builder.
 ```
 
 **If Oracle says SIMPLE:**

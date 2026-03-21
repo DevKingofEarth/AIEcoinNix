@@ -10,9 +10,9 @@
     "rm -rf */": "deny"
   },
   "agent": {
-    "builder": {
+    "builder-bob": {
       "mode": "primary",
-      "description": "🔧 Implementation engine - delegates to Oracle for strategy, executes Luffy Loop, handles interventions",
+      "description": "🔧 Builder Bob - Implementation engine - delegates to Bright Oracle for strategy, executes Luffy Loop, handles interventions",
       "temperature": 0.1,
       "tools": {
         "write": true,
@@ -39,9 +39,9 @@
         }
       }
     },
-    "planner": {
+    "nerd-planner": {
       "mode": "primary",
-      "description": "📋 Strategic planning agent - Creates plans and analysis, leaves implementation to Builder",
+      "description": "📋 Nerd Planner - Strategic planning agent - Creates plans and analysis, leaves implementation to Builder Bob",
       "temperature": 0.1,
       "tools": {
         "write": true,
@@ -82,7 +82,7 @@
     },
     "oracle": {
       "mode": "subagent",
-      "description": "🔮 Strategic execution conductor - Analyzes plans, manages Luffy Loop with intervention planning, verifies completion",
+      "description": "🔮 Bright Oracle - Strategic execution conductor - Analyzes plans, manages Luffy Loop with intervention planning, verifies completion",
       "temperature": 0.1,
       "tools": {
         "write": false,
@@ -237,6 +237,26 @@
           }
         }
       }
+    }
+  },
+  "mcp": {
+    "markdownify": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "zcaceres/markdownify-mcp"
+      ],
+      "enabled": true
+    },
+    "pencil": {
+      "command": [
+        "/home/dharrun/.vscode-oss/extensions/highagency.pencildev-0.6.30-universal/out/mcp-server-linux-x64",
+        "--app",
+        "vscodium"
+      ],
+      "enabled": true,
+      "type": "local"
     }
   }
 }
