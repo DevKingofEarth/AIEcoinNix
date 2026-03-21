@@ -2,10 +2,82 @@ import { tool } from "@opencode-ai/plugin"
 import fs from "fs";
 import path from "path";
 
-const STATE_FILE = path.join(
+const STATE_DIR = path.join(
   process.env.HOME || "~",
-  ".config/opencode/.state/luffy-loop.json"
+  ".config/opencode/.state/sessions"
 );
+
+// ============================================================================
+// PATH HELPERS
+// ============================================================================
+
+function getStateFile(sessionID: string): string {
+  return path.join(STATE_DIR, `${sessionID}.json`);
+}
+
+// ============================================================================
+// MUTEX FOR SAFE WRITES
+// ============================================================================
+
+let writeQueue: Promise<void> = Promise.resolve();
+
+async function safeWrite(state: Partial<LoopState>, sessionID: string): Promise<void> {
+  await writeQueue;
+  
+  const stateFile = getStateFile(sessionID);
+  
+  writeQueue = (async () => {
+    const absolutePath = path.resolve(stateFile);
+    const dir = path.dirname(absolutePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    let current: LoopState = {
+      active: false,
+      paused: false,
+      iteration: 0,
+      maxIterations: 10,
+      checkpointInterval: 5,
+      completionPromise: "DONE",
+      prompt: "",
+      startedAt: "",
+      lastCheckpoint: 0,
+      lastIterationAt: "",
+      interventionPlan: null,
+      metrics: [],
+      oracleDecision: null,
+      oracleDecisionAt: null,
+      oracleDecisionReason: null,
+      nextCheckpointAt: 5,
+      progressRate: 0,
+      errorRate: 0,
+      convergenceScore: 0,
+      completedTodos: [],
+      failures: []
+    };
+    
+    try {
+      if (fs.existsSync(absolutePath)) {
+        current = JSON.parse(fs.readFileSync(absolutePath, 'utf-8'));
+      }
+    } catch {
+      // Use default state
+    }
+    
+    // MERGE strategy - preserve interventionPlan
+    const merged: LoopState = {
+      ...current,
+      ...state,
+      // NEVER overwrite interventionPlan - it's set by oracle-control
+      interventionPlan: current.interventionPlan,
+    };
+    
+    fs.writeFileSync(absolutePath, JSON.stringify(merged, null, 2));
+  })();
+  
+  await writeQueue;
+}
 
 interface IterationMetrics {
   filesChanged: number;
@@ -18,13 +90,22 @@ interface IterationMetrics {
 }
 
 interface InterventionPlan {
-  totalTodos: number;
-  todosPerIteration: number;
-  iterationsNeeded: number;
-  oracleInterventions: number[];
-  userInterventions: number[];
+  totalIterations: number;
+  oracleCheckpoints: number[];
+  userCheckpoints: number[];
+  totalTodos?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+interface Failure {
+  id: string;
+  iteration: number;
+  type: 'user_scold' | 'ai_blunder' | 'disagreement' | 'revert';
+  description: string;
+  resolved: boolean;
+  resolvedAt: string | null;
+  createdAt: string;
 }
 
 interface LoopState {
@@ -51,6 +132,8 @@ interface LoopState {
   convergenceScore: number;
   // Completed TODOs tracking
   completedTodos: string[];
+  // Failure tracking
+  failures: Failure[];
 }
 
 const DEFAULT_STATE: LoopState = {
@@ -75,12 +158,13 @@ const DEFAULT_STATE: LoopState = {
   progressRate: 0,
   errorRate: 0,
   convergenceScore: 0,
-  completedTodos: []
+  completedTodos: [],
+  failures: []
 };
 
-function loadState(): LoopState {
+function loadState(sessionID: string): LoopState {
   try {
-    const absolutePath = path.resolve(STATE_FILE);
+    const absolutePath = path.resolve(getStateFile(sessionID));
     if (fs.existsSync(absolutePath)) {
       const content = fs.readFileSync(absolutePath, "utf-8");
       const state = JSON.parse(content);
@@ -92,22 +176,9 @@ function loadState(): LoopState {
   return { ...DEFAULT_STATE };
 }
 
-function saveState(state: LoopState): void {
+function resetState(sessionID: string): void {
   try {
-    const absolutePath = path.resolve(STATE_FILE);
-    const dir = path.dirname(absolutePath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(absolutePath, JSON.stringify(state, null, 2));
-  } catch (error) {
-    // Silently fail - state won't persist
-  }
-}
-
-function resetState(): void {
-  try {
-    const absolutePath = path.resolve(STATE_FILE);
+    const absolutePath = path.resolve(getStateFile(sessionID));
     if (fs.existsSync(absolutePath)) {
       fs.unlinkSync(absolutePath);
     }
@@ -165,14 +236,16 @@ export default tool({
 - resume: Continue after Oracle decision
 - terminate: Stop completely
 - update_metrics: Record iteration metrics
+- complete_todos: Mark TODOs as completed
 - check_checkpoint: Check if at intervention point
 - get_decision: Read Oracle's decision from state
-- set_decision: Write Oracle's decision
+- record_failure: Record a failure (user scold, AI blunder, disagreement)
 
 **Features:**
 - Intervention planning (Oracle + User intervention points)
 - Dynamic checkpoint intervals
 - Metrics tracking: files changed, errors, tests
+- Failure tracking: user scolds, AI blunders, disagreements
 - State-driven protocol (survives restarts)
 
 **Workflow:**
@@ -182,12 +255,14 @@ export default tool({
 4. At intervention: Auto-pause, invoke @oracle
 5. Oracle: Reviews → set_decision
 6. Builder: resume
-7. On completion: @oracle verify`,
+7. On failure: @luffy_loop record_failure
+8. On completion: @oracle verify`,
 
   args: {
     command: tool.schema.enum([
       "start", "status", "iterate", "pause", "resume", "terminate",
-      "update_metrics", "check_checkpoint", "get_decision", "set_decision"
+      "update_metrics", "check_checkpoint", "get_decision", "complete_todos",
+      "record_failure"
     ]).describe("Command to execute"),
     prompt: tool.schema.string().optional().describe("Task prompt (for start)"),
     maxIterations: tool.schema.number().min(1).max(100).default(10).optional()
@@ -206,32 +281,41 @@ export default tool({
     // set_decision args
     decision: tool.schema.enum(["CONTINUE", "PAUSE", "ADJUST", "TERMINATE"]).optional()
       .describe("Oracle's decision"),
-    reason: tool.schema.string().optional().describe("Reason for decision")
+    reason: tool.schema.string().optional().describe("Reason for decision"),
+    // record_failure args
+    failureType: tool.schema.enum(["user_scold", "ai_blunder", "disagreement", "revert"]).optional()
+      .describe("Type of failure"),
+    failureDescription: tool.schema.string().optional().describe("Description of failure"),
+    // complete_todos args
+    completedTodos: tool.schema.array(tool.schema.string()).optional()
+      .describe("TODOs completed this iteration")
   },
 
   async execute(args, context) {
+    const sessionID = context.sessionID;
     const { command } = args;
 
     switch (command) {
       case "start":
         return await this.startLoop(
+          sessionID,
           args.prompt || "",
           args.maxIterations || 10,
           args.checkpointInterval || 5,
           args.completionPromise || "DONE"
         );
       case "status":
-        return await this.status();
+        return await this.status(sessionID);
       case "iterate":
-        return await this.iterate();
+        return await this.iterate(sessionID);
       case "pause":
-        return await this.pause();
+        return await this.pause(sessionID);
       case "resume":
-        return await this.resume();
+        return await this.resume(sessionID);
       case "terminate":
-        return await this.terminate();
+        return await this.terminate(sessionID);
       case "update_metrics":
-        return await this.updateMetrics({
+        return await this.updateMetrics(sessionID, {
           filesChanged: args.filesChanged || 0,
           filesModified: args.filesModified || 0,
           errorsEncountered: args.errorsEncountered || 0,
@@ -240,18 +324,24 @@ export default tool({
           iterationDuration: args.iterationDuration || 0
         });
       case "check_checkpoint":
-        return await this.checkCheckpoint();
+        return await this.checkCheckpoint(sessionID);
       case "get_decision":
-        return await this.getDecision();
-      case "set_decision":
-        return await this.setDecision(args.decision || "CONTINUE", args.reason || "");
+        return await this.getDecision(sessionID);
+      case "complete_todos":
+        return await this.completeTodos(sessionID, args.completedTodos || []);
+      case "record_failure":
+        return await this.recordFailure(
+          sessionID,
+          args.failureType as any || "ai_blunder",
+          args.failureDescription || ""
+        );
       default:
         return `Unknown command: ${command}`;
     }
   },
 
-  async startLoop(prompt: string, maxIterations: number, checkpointInterval: number, completionPromise: string) {
-    let state = loadState();
+  async startLoop(sessionID: string, prompt: string, maxIterations: number, checkpointInterval: number, completionPromise: string) {
+    let state = loadState(sessionID);
     
     if (state.active) {
       return `**Loop already active**
@@ -265,9 +355,9 @@ Use @luffy_loop command=status to check progress, or terminate first.`;
 
     // Check if intervention plan exists
     const hasInterventionPlan = state.interventionPlan !== null;
-    const iterationsToUse = hasInterventionPlan ? state.interventionPlan!.iterationsNeeded : maxIterations;
+    const iterationsToUse = hasInterventionPlan ? state.interventionPlan!.totalIterations : maxIterations;
     const firstCheckpoint = hasInterventionPlan 
-      ? (state.interventionPlan!.oracleInterventions[0] || iterationsToUse)
+      ? (state.interventionPlan!.oracleCheckpoints[0] || iterationsToUse)
       : checkpointInterval;
 
     const newState: LoopState = {
@@ -282,18 +372,19 @@ Use @luffy_loop command=status to check progress, or terminate first.`;
       startedAt: new Date().toISOString(),
       nextCheckpointAt: firstCheckpoint,
       interventionPlan: hasInterventionPlan ? state.interventionPlan : null,
-      completedTodos: []
+      completedTodos: [],
+      failures: []
     };
     
-    saveState(newState);
+    safeWrite(newState, sessionID);
 
     const planInfo = hasInterventionPlan
       ? `
 **Intervention Plan:**
-- Total TODOs: ${state.interventionPlan!.totalTodos}
-- Iterations: ${state.interventionPlan!.iterationsNeeded}
-- Oracle interventions: [${state.interventionPlan!.oracleInterventions.join(", ")}]
-- User interventions: [${state.interventionPlan!.userInterventions.join(", ")}]`
+- Total Iterations: ${state.interventionPlan!.totalIterations}
+${state.interventionPlan!.totalTodos ? `- Total TODOs: ${state.interventionPlan!.totalTodos}` : ''}
+- Oracle Checkpoints: [${state.interventionPlan!.oracleCheckpoints.join(", ")}]
+- User Checkpoints: [${state.interventionPlan!.userCheckpoints.join(", ")}]`
       : "";
 
     return `**🦓 Luffy Loop Started**
@@ -314,8 +405,8 @@ Use @luffy_loop command=status to check progress, or terminate first.`;
 **Next:** Builder executes first iteration.`;
   },
 
-  async status() {
-    const state = loadState();
+  async status(sessionID: string) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return `**No active loop**
@@ -362,13 +453,29 @@ ${progress}${checkpoint}${nextCheckpoint}${elapsed}${oracleStatus}${metricsSumma
 **State File:** ~/.config/opencode/.state/luffy-loop.json`;
   },
 
-  async iterate() {
-    const state = loadState();
+  async iterate(sessionID: string) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return `**No active loop**
 
 Start a loop: @luffy_loop command=start prompt="..."`;
+    }
+
+    // ENFORCEMENT: Cannot iterate if paused without decision
+    if (state.paused && !state.oracleDecision) {
+      return JSON.stringify({
+        error: true,
+        blocked: true,
+        reason: "PAUSED_WITHOUT_DECISION",
+        message: "Cannot iterate: Loop is paused but no Oracle decision exists.",
+        requiredAction: "@oracle review checkpoint before resuming",
+        currentState: {
+          iteration: state.iteration,
+          paused: state.paused,
+          oracleDecision: state.oracleDecision
+        }
+      }, null, 2);
     }
 
     if (state.paused) {
@@ -389,10 +496,10 @@ Actions:
       // Check if we have an intervention plan for completion
       if (state.interventionPlan) {
         // Check if this is a user intervention point (completion)
-        const isUserIntervention = state.interventionPlan.userInterventions.includes(state.iteration);
-        if (isUserIntervention) {
+        const isUserCheckpoint = state.interventionPlan.userCheckpoints.includes(state.iteration);
+        if (isUserCheckpoint) {
           state.paused = true;
-          saveState(state);
+          safeWrite(state, sessionID);
           
           return JSON.stringify({
             __type: "CHECKPOINT_SIGNAL",
@@ -433,12 +540,10 @@ Iteration: ${state.iteration}/${state.maxIterations}
     let interventionType: "oracle" | "user" | null = null;
     
     if (state.interventionPlan) {
-      // Check Oracle intervention points
-      if (state.interventionPlan.oracleInterventions.includes(state.iteration)) {
+      if (state.interventionPlan.oracleCheckpoints.includes(state.iteration)) {
         interventionType = "oracle";
       }
-      // Check User intervention points
-      else if (state.interventionPlan.userInterventions.includes(state.iteration)) {
+      else if (state.interventionPlan.userCheckpoints.includes(state.iteration)) {
         interventionType = "user";
       }
     }
@@ -458,7 +563,7 @@ Iteration: ${state.iteration}/${state.maxIterations}
       state.errorRate = errorRate;
       state.convergenceScore = convergenceScore;
       
-      saveState(state);
+      safeWrite(state, sessionID);
       
       // Return structured signal with intervention type
       return JSON.stringify({
@@ -484,14 +589,14 @@ Iteration: ${state.iteration}/${state.maxIterations}
       }, null, 2);
     }
     
-    saveState(state);
+    safeWrite(state, sessionID);
     
     return `**Iteration ${state.iteration}/${state.maxIterations}**
 
 Progress: ${Math.round((state.iteration/state.maxIterations)*100)}%
-Next intervention: At iteration ${state.interventionPlan ? 
-  (state.interventionPlan.oracleInterventions.find(i => i > state.iteration) || 
-   state.interventionPlan.userInterventions.find(i => i > state.iteration) || 
+Next checkpoint: At iteration ${state.interventionPlan ? 
+  (state.interventionPlan.oracleCheckpoints.find(i => i > state.iteration) || 
+   state.interventionPlan.userCheckpoints.find(i => i > state.iteration) || 
    state.maxIterations) : 
   state.nextCheckpointAt}
 
@@ -501,8 +606,8 @@ Next intervention: At iteration ${state.interventionPlan ?
 - @luffy_loop command=iterate`;
   },
 
-  async pause() {
-    const state = loadState();
+  async pause(sessionID: string) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return `**No active loop to pause**
@@ -520,7 +625,7 @@ Use @oracle action=review for Oracle review.`;
     }
 
     state.paused = true;
-    saveState(state);
+    safeWrite(state, sessionID);
 
     return `**⏸️ Luffy Loop Paused**
 
@@ -532,8 +637,8 @@ Use @oracle action=review for Oracle review.`;
 Use @oracle action=review to trigger Oracle review.`;
   },
 
-  async resume() {
-    const state = loadState();
+  async resume(sessionID: string) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return `**No active loop to resume**
@@ -551,8 +656,7 @@ Iteration: ${state.iteration}/${state.maxIterations}`;
     let nextInterval: number;
     
     if (state.interventionPlan) {
-      // Use pre-planned intervention points
-      const nextOracle = state.interventionPlan.oracleInterventions.find(i => i > state.iteration);
+      const nextOracle = state.interventionPlan.oracleCheckpoints.find(i => i > state.iteration);
       if (nextOracle) {
         nextInterval = nextOracle - state.iteration;
         state.nextCheckpointAt = nextOracle;
@@ -576,7 +680,7 @@ Iteration: ${state.iteration}/${state.maxIterations}`;
     state.oracleDecisionAt = null;
     state.oracleDecisionReason = null;
     
-    saveState(state);
+    safeWrite(state, sessionID);
 
     return `**▶️ Luffy Loop Resumed**
 
@@ -588,14 +692,14 @@ ${previousReason ? `**Reason:** ${previousReason}` : ''}
 **Protocol:** Do work → update_metrics → iterate`;
   },
 
-  async terminate() {
-    const state = loadState();
+  async terminate(sessionID: string) {
+    const state = loadState(sessionID);
     
     const wasActive = state.active;
     const iteration = state.iteration;
     const prompt = state.prompt;
     
-    resetState();
+    resetState(sessionID);
 
     if (!wasActive) {
       return `**No active loop to terminate**
@@ -616,7 +720,7 @@ Start a loop: @luffy_loop command=start prompt="..."`;
   // NEW: Metrics & Protocol Commands
   // ===========================================================================
 
-  async updateMetrics(metrics: {
+  async updateMetrics(sessionID: string, metrics: {
     filesChanged: number;
     filesModified: number;
     errorsEncountered: number;
@@ -624,7 +728,7 @@ Start a loop: @luffy_loop command=start prompt="..."`;
     testsFailed: number;
     iterationDuration: number;
   }) {
-    const state = loadState();
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return `**No active loop**
@@ -650,7 +754,7 @@ Start a loop first: @luffy_loop command=start prompt="..."`;
     state.errorRate = errorRate;
     state.convergenceScore = convergenceScore;
     
-    saveState(state);
+    safeWrite(state, sessionID);
 
     return `**Metrics Updated**
 
@@ -667,8 +771,8 @@ Iteration ${state.iteration}:
 **Next:** @luffy_loop command=iterate`;
   },
 
-  async checkCheckpoint() {
-    const state = loadState();
+  async checkCheckpoint(sessionID: string) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return JSON.stringify({
@@ -690,8 +794,8 @@ Iteration ${state.iteration}:
     }, null, 2);
   },
 
-  async getDecision() {
-    const state = loadState();
+  async getDecision(sessionID: string) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
       return JSON.stringify({
@@ -714,39 +818,55 @@ Iteration ${state.iteration}:
     }, null, 2);
   },
 
-  async setDecision(decision: 'CONTINUE' | 'PAUSE' | 'TERMINATE', reason: string) {
-    const state = loadState();
+  async recordFailure(sessionID: string, type: 'user_scold' | 'ai_blunder' | 'disagreement' | 'revert', description: string) {
+    const state = loadState(sessionID);
+    
+    if (!state.failures) {
+      state.failures = [];
+    }
+    
+    const failure: Failure = {
+      id: `fail-${Date.now()}`,
+      iteration: state.iteration,
+      type,
+      description,
+      resolved: false,
+      resolvedAt: null,
+      createdAt: new Date().toISOString()
+    };
+    
+    state.failures.push(failure);
+    safeWrite(state, sessionID);
+    
+    return `**Failure Recorded** ⚠️
+
+**ID:** ${failure.id}
+**Type:** ${type}
+**Iteration:** ${state.iteration}
+**Description:** ${description}
+
+**Total Failures:** ${state.failures.length}
+**Unresolved:** ${state.failures.filter(f => !f.resolved).length}`;
+  },
+
+  async completeTodos(sessionID: string, completed: string[]) {
+    const state = loadState(sessionID);
     
     if (!state.active) {
-      return `**Cannot set decision: No active loop**`;
-    }
-
-    state.oracleDecision = decision;
-    state.oracleDecisionAt = new Date().toISOString();
-    state.oracleDecisionReason = reason;
-    
-    // If CONTINUE, calculate next checkpoint interval
-    if (decision === 'CONTINUE') {
-      const nextInterval = calculateNextCheckpointInterval(state);
-      state.nextCheckpointAt = state.iteration + nextInterval;
-      state.checkpointInterval = nextInterval;
+      return `**No active loop**`;
     }
     
-    saveState(state);
+    if (!state.completedTodos) {
+      state.completedTodos = [];
+    }
+    
+    state.completedTodos = [...new Set([...state.completedTodos, ...completed])];
+    safeWrite(state, sessionID);
+    
+    return `**TODOs Completed**
 
-    const intervalInfo = decision === 'CONTINUE' 
-      ? `\n**Next checkpoint:** Iteration ${state.nextCheckpointAt} (interval: ${state.checkpointInterval})`
-      : '';
-
-    return `**Oracle Decision Recorded**
-
-**Decision:** ${decision}
-**Reason:** ${reason || 'Not specified'}
-**At:** ${state.oracleDecisionAt}${intervalInfo}
-
-**Builder action:**
-${decision === 'CONTINUE' ? '- @luffy_loop command=resume' : ''}
-${decision === 'PAUSE' ? '- Wait for user input' : ''}
-${decision === 'TERMINATE' ? '- @luffy_loop command=terminate' : ''}`;
+Completed this update: [${completed.join(", ")}]
+Total completed: ${state.completedTodos.length}
+${state.interventionPlan?.totalTodos ? `Progress: ${state.completedTodos.length}/${state.interventionPlan.totalTodos}` : ''}`;
   }
 })
