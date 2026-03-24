@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.2.27",
+    "@types/node": "^25.5.0",
+    "esbuild": "^0.27.4",
+    "typescript": "^5.9.3"
+  }
+}

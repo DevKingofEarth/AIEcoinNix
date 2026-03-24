@@ -72,7 +72,7 @@ export default tool({
     const timeoutId = setTimeout(() => controller.abort(), timeout || config.webParser.timeout)
 
     try {
-      const response = await fetch(`${config.webParser.url}/crawl?${new URLSearchParams({
+      const response = await fetch(`${config.webParser.url}/crawl/crawl?${new URLSearchParams({
         url: query,
         deep: String(deep),
         max_results: String(maxResults)
@@ -154,7 +154,7 @@ ${content}
 
 async function checkServiceStatus(url: string): Promise<{available: boolean, error?: string}> {
   try {
-    const response = await fetch(`${url}/crawl?url=test&deep=false`, {
+    const response = await fetch(`${url}/crawl/crawl?url=test&deep=false`, {
       method: 'GET',
       signal: AbortSignal.timeout(5000)
     })
