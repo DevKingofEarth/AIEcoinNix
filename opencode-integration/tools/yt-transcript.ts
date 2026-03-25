@@ -26,8 +26,10 @@ export default tool({
     const { url, lang } = args
     
     try {
-      // Build yt-dlp command
-      let cmd = `yt-dlp --write-auto-sub --sub-lang ${lang || 'en'} --skip-download --convert-subs srt --output /tmp/ytdlp_transcript.%(ext)s "${url}"`
+      const langArg = lang || 'en'
+      
+      // Build yt-dlp command - use correct options
+      let cmd = `yt-dlp --write-auto-subs --sub-langs ${langArg} --skip-download --convert-subs srt --output "/tmp/ytdlp_transcript" "${url}"`
       
       // Execute yt-dlp
       const { stdout, stderr } = await execAsync(cmd, { timeout: 60000 })
@@ -58,8 +60,8 @@ ${transcript}
 *Extracted using yt-dlp*`
       }
       
-      // Try to get transcript directly
-      const directCmd = `yt-dlp --get-transcript ${lang ? `--sub-lang ${lang}` : ''} --skip-download "${url}"`
+      // Try alternative method - download subs as json
+      const directCmd = `yt-dlp --write-subs --write-auto-subs --sub-langs ${langArg} --skip-download --dump-json "${url}" 2>/dev/null | head -100`
       const directResult = await execAsync(directCmd, { timeout: 60000 })
       
       return `**YouTube Transcript**
