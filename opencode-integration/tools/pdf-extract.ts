@@ -27,7 +27,7 @@ export default tool({
 
     try {
       // Call the AI Services endpoint
-      const url = `http://localhost:18090/extract-pdf?path=${encodeURIComponent(path)}&ocr=${ocr}`
+      const url = `http://localhost:18090/pdf/extract-pdf?path=${encodeURIComponent(path)}&ocr=${ocr}`
       const cmd = `curl -s "${url}"`
       
       const { stdout, stderr } = await execAsync(cmd, { timeout: 30000 })
